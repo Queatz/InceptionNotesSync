@@ -1,5 +1,7 @@
 package com.inceptionnotes.db
 
+import com.arangodb.entity.CollectionType
+
 fun collections() = listOf(
     collection<Note> {
         index(Note::steward)
@@ -10,5 +12,5 @@ fun collections() = listOf(
     collection<Invitation> {
         index(Invitation::token)
     },
-    collection<Item> {  }
+    collection<Item>(collectionType = CollectionType.EDGES, nodes = listOf(Note::class)) {  }
 )

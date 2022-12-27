@@ -1,11 +1,8 @@
 package com.inceptionnotes.routes
 
-import com.inceptionnotes.db
+import com.inceptionnotes.*
 import com.inceptionnotes.db.Invitation
 import com.inceptionnotes.db.invitations
-import com.inceptionnotes.parameter
-import com.inceptionnotes.steward
-import com.inceptionnotes.token
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -15,13 +12,13 @@ import io.ktor.server.routing.*
 fun Route.invitationRoutes() {
     authenticate {
         get("/invitations") {
-            steward { db.invitations() }
+            respond { db.invitations() }
         }
         post("/invitations") {
             steward { db.insert(Invitation(token = (0..36).token())) }
         }
         get("/invitations/{id}") {
-            steward { db.document(Invitation::class, parameter("id")) ?: HttpStatusCode.NotFound }
+            respond { db.document(Invitation::class, parameter("id")) ?: HttpStatusCode.NotFound }
         }
         post("/invitations/{id}") {
             steward {

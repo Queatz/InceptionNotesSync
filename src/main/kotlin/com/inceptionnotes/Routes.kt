@@ -3,6 +3,7 @@ package com.inceptionnotes
 import com.inceptionnotes.db.Invitation
 import com.inceptionnotes.routes.meRoutes
 import com.inceptionnotes.routes.invitationRoutes
+import com.inceptionnotes.routes.syncRoutes
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -12,11 +13,12 @@ import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.util.pipeline.*
 import io.ktor.websocket.*
+import java.nio.charset.Charset
 
 fun Application.routes() {
     routing {
         get("/hi") {
-            call.respond("hi" to true)
+            call.respond(mapOf("hi" to true))
         }
         webSocket("/ws") {
             ws.connect(this)
@@ -35,6 +37,7 @@ fun Application.routes() {
         }
         meRoutes()
         invitationRoutes()
+        syncRoutes()
     }
 }
 
@@ -47,4 +50,12 @@ suspend inline fun <reified T : Any> PipelineContext<*, ApplicationCall>.steward
 suspend inline fun <reified T : Any> PipelineContext<*, ApplicationCall>.respond(block: () -> T) {
     call.respond(block())
 }
+suspend inline fun <reified T : Any> PipelineContext<*, ApplicationCall>.respondJson(block: () -> T) {
+    val result = block()
+    when (result) {
+        is String -> call.respondText(result, ContentType.Application.Json.withCharset(Charsets.UTF_8))
+        else -> call.respond(result)
+    }
+}
+
 fun PipelineContext<*, ApplicationCall>.parameter(parameter: String): String = call.parameters[parameter]!!

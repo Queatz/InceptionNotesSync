@@ -2,17 +2,17 @@ package com.inceptionnotes.db
 
 val Db.countInvitations get() = query(Int::class, """
     return count(`${Invitation::class.collection}`)
-""".trimIndent()).first()
+""".trimIndent()).first()!!
 
 fun Db.invitations() = list(
     Invitation::class, """
-    for invitation in @collection return invitation
+    for invitation in @@collection return invitation
 """.trimIndent()
 )
 
 fun Db.invitationFromToken(token: String) = one(
     Invitation::class, """
-    for invitation in @collection
+    for invitation in @@collection
         filter invitation.${f(Invitation::token)} == @token
             return invitation
 """.trimIndent(),
@@ -33,7 +33,7 @@ fun Db.invitationFromDeviceToken(token: String) = one(
     Invitation::class, """
     for device in ${Device::class.collection}
         for invitation in @@collection
-            filter device.${f(Device::token)} == @token and device.${f(Device::invitation)} == invitation._id
+            filter device.${f(Device::token)} == @token and device.${f(Device::invitation)} == invitation._key
                 return invitation
 """.trimIndent(),
     mapOf("token" to token)
@@ -42,16 +42,16 @@ fun Db.invitationFromDeviceToken(token: String) = one(
 fun Db.allNoteRevsByInvitation(invitation: String) = list(
     Note::class, """
         let ids = (
-            for note in ${Note::class.collection}
+            for note in @@collection
                 filter note.${f(Note::steward)} == @invitation
                         or @invitation in note.${f(Note::invitations)}
                     return note._id
         )
-        for note in @collection
+        for note in @@collection
             filter first(
-                for v in 0..99 inbound id graph ${Item::class.graph}
+                for v in 0..99 inbound note graph `${Item::class.graph}`
                     prune found = v._id in ids
-                    options { uniqueVertices: 'global' }
+                    options { order: 'weighted', uniqueVertices: 'global' }
                     filter found
                     return v
             ) != null

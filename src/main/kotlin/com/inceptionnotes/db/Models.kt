@@ -10,19 +10,23 @@ import com.arangodb.internal.DocumentFields
 import kotlinx.datetime.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
 
+@Serializable
 data class Device(
     var token: String? = null,
     var invitation: String? = null
 ) : Model()
 
+@Serializable
 data class Invitation(
     var token: String? = null,
     var name: String? = null,
     var isSteward: Boolean? = null
 ) : Model()
 
+@Serializable
 data class Note(
     var steward: String? = null,
     var invitations: List<String>? = null,
@@ -38,13 +42,16 @@ data class Note(
     var estimate: Double? = null
 ) : Model()
 
+@Serializable
 class Item : Edge()
 
+@Serializable
 data class NoteOptions(
     var enumerate: Boolean? = null,
     var invertText: Boolean? = null
 )
 
+@Serializable
 open class Model(
     @Key
     @SerialName("id")
@@ -58,6 +65,7 @@ open class Model(
     var updated: Instant? = null
 )
 
+@Serializable
 open class Edge(
     @From
     @SerialName("from")

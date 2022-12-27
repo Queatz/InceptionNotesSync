@@ -155,7 +155,7 @@ private fun ArangoDatabase.setup(): ArangoDatabase {
 
 inline fun <reified T : Model> collection(
     collectionType: CollectionType = CollectionType.DOCUMENT,
-    nodes: List<KClass<T>> = listOf(),
+    nodes: List<KClass<out Model>> = listOf(),
     noinline block: ArangoCollection.() -> Unit = {}
 ) = CollectionConfig(
     T::class.collection,

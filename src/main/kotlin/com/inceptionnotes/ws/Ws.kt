@@ -11,43 +11,57 @@ import com.inceptionnotes.updateAllFrom
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlin.reflect.KMutableProperty1
+import kotlinx.serialization.json.*
+
+val actions = mapOf(
+    IdentifyOutgoingEvent::class to IdentifyOutgoingEvent.ACTION,
+    SyncOutgoingEvent::class to SyncOutgoingEvent.ACTION,
+    StateOutgoingEvent::class to StateOutgoingEvent.ACTION,
+)
+
+inline fun <reified T : OutgoingEvent> T.toArrayEvent() = listOf(
+    actions[this@toArrayEvent::class] ?: throw RuntimeException("${this@toArrayEvent::class} has no registered action"),
+    this
+)
+
+inline fun <reified T : OutgoingEvent> T.toJsonArrayEvent() = buildJsonArray {
+    add(json.encodeToJsonElement(actions[this@toJsonArrayEvent::class] ?: throw RuntimeException("${this@toJsonArrayEvent::class} has no registered action")))
+    add(json.encodeToJsonElement(this@toJsonArrayEvent))
+}
 
 class WsSession(val session: DefaultWebSocketServerSession) {
 
-    private var invitation: Invitation? = null
+    var invitation: Invitation? = null
+        private set
     private var deviceToken: String? = null
     private val me get() = invitation!!.id!!
 
-    suspend fun identify(event: IdentifyEvent) {
+    private suspend fun identify(event: IdentifyEvent): List<OutgoingEvent> {
         deviceToken = event.device
         invitation = db.invitationFromDeviceToken(event.device)
 
-        if (invitation == null) {
+        return if (invitation == null) {
             session.close(CloseReason(CloseReason.Codes.NORMAL, "no invitation"))
+            emptyList()
         } else {
-            send(IdentifyOutgoingEvent(invitation, db.allNoteRevsByInvitation(invitation!!.id!!)))
+            listOf(IdentifyOutgoingEvent(invitation!!))
         }
     }
 
-    suspend fun state(event: StateEvent) {
+    private suspend fun state(event: StateEvent): List<OutgoingEvent> {
         val clientState = event.notes.associateBy { it.id }
         val stateDiff = db.allNoteRevsByInvitation(me)
-            .filter { clientState[it.id]?.rev == it.rev }
+            .filter { clientState[it.id]?.rev != it.rev }
             .mapNotNull { db.document(Note::class, it.id!!) }
-        send(SyncOutgoingEvent(stateDiff))
+        return listOf(SyncOutgoingEvent(stateDiff))
     }
 
-    suspend fun sync(event: SyncEvent) {
+    private suspend fun sync(event: SyncEvent): List<OutgoingEvent> {
         val state = event.notes.mapNotNull { clientNote ->
             val note = db.document(Note::class, clientNote.id!!)
 
             if (note == null) {
-                clientNote.rev = null // ensure set by server
+                clientNote.rev = null // ensure this gets set by server
                 clientNote.created = null
                 clientNote.updated = null
                 clientNote.steward = me
@@ -60,11 +74,35 @@ class WsSession(val session: DefaultWebSocketServerSession) {
                 null
             }
         }
-        send(StateOutgoingEvent(state))
+
+        return if (state.isEmpty()) emptyList() else listOf(StateOutgoingEvent(state))
     }
 
-    private suspend fun send(event: OutgoingEvent) =
-        session.outgoing.send(Frame.Text(json.encodeToString(event)))
+    suspend fun send(events: List<OutgoingEvent>) =
+        session.outgoing.send(
+            Frame.Text(
+                json.encodeToString(
+                    events.map { event -> event.toJsonArrayEvent()}
+                )
+            )
+        )
+
+    suspend fun receive(text: String): List<OutgoingEvent> {
+        return json.parseToJsonElement(text).jsonArray
+            .flatMap {
+                val action = it.jsonArray[0].jsonPrimitive.contentOrNull
+                val element = it.jsonArray[1]
+                when (action) {
+                    IdentifyEvent.ACTION -> identify(json.decodeFromJsonElement(element))
+                    StateEvent.ACTION -> state(json.decodeFromJsonElement(element))
+                    SyncEvent.ACTION -> sync(json.decodeFromJsonElement(element))
+                    else -> {
+                        logger.warn("$text does not contain a known action")
+                        emptyList()
+                    }
+                }
+            }
+    }
 }
 
 private fun Note.updateFrom(referenceNote: Note) {
@@ -91,18 +129,15 @@ class Ws {
     fun connect(session: DefaultWebSocketServerSession) = sessions.add(WsSession(session))
     fun disconnect(session: DefaultWebSocketServerSession) = sessions.removeIf { it.session == session }
 
-    suspend fun frame(session: DefaultWebSocketServerSession, text: String) {
-        val wsSession = sessions.first { it.session == session }
-        val element = json.parseToJsonElement(text).jsonObject
-        when (element[ACTION]?.jsonPrimitive?.contentOrNull) {
-            IdentifyEvent.ACTION -> wsSession.identify(json.decodeFromJsonElement(element))
-            StateEvent.ACTION -> wsSession.state(json.decodeFromJsonElement(element))
-            SyncEvent.ACTION -> wsSession.sync(json.decodeFromJsonElement(element))
-            else -> logger.warn("$text does not contain a known action")
-        }
-    }
+    fun getSession(invitation: Invitation) = sessions.find { it.invitation?.id == invitation.id!! }
 
-    companion object {
-        private const val ACTION = "action"
+    suspend fun frame(serverSession: DefaultWebSocketServerSession, text: String) {
+        sessions.first { it.session == serverSession }.let { session ->
+            val events = session.receive(text)
+
+            if (events.isNotEmpty()) {
+                session.send(events)
+            }
+        }
     }
 }

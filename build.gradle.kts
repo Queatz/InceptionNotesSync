@@ -38,7 +38,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.4.1")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.0")
     implementation("com.arangodb:arangodb-java-driver:6.20.0")
-    implementation("com.arangodb:jackson-dataformat-velocypack:3.1.0")
+    implementation("com.arangodb:jackson-dataformat-velocypack:3.1.0") {
+        exclude("com.arangodb", "velocypack") // https://github.com/arangodb/jackson-dataformat-velocypack/issues/17
+    }
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
 }
