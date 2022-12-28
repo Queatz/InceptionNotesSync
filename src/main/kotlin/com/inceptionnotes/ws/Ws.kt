@@ -1,15 +1,10 @@
 package com.inceptionnotes.ws
 
-import com.inceptionnotes.db
-import com.inceptionnotes.db.Invitation
-import com.inceptionnotes.db.Note
-import com.inceptionnotes.db.allNoteRevsByInvitation
-import com.inceptionnotes.db.invitationFromDeviceToken
-import com.inceptionnotes.logger
-import com.inceptionnotes.json
-import com.inceptionnotes.updateAllFrom
+import com.inceptionnotes.*
+import com.inceptionnotes.db.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
+import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 
@@ -19,22 +14,26 @@ val actions = mapOf(
     StateOutgoingEvent::class to StateOutgoingEvent.ACTION,
 )
 
-inline fun <reified T : OutgoingEvent> T.toArrayEvent() = listOf(
-    actions[this@toArrayEvent::class] ?: throw RuntimeException("${this@toArrayEvent::class} has no registered action"),
-    this
-)
-
 inline fun <reified T : OutgoingEvent> T.toJsonArrayEvent() = buildJsonArray {
-    add(json.encodeToJsonElement(actions[this@toJsonArrayEvent::class] ?: throw RuntimeException("${this@toJsonArrayEvent::class} has no registered action")))
+    add(
+        json.encodeToJsonElement(
+            actions[this@toJsonArrayEvent::class]
+                ?: throw RuntimeException("${this@toJsonArrayEvent::class} has no registered action")
+        )
+    )
     add(json.encodeToJsonElement(this@toJsonArrayEvent))
 }
 
-class WsSession(val session: DefaultWebSocketServerSession) {
+class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: suspend (Invitation, Note) -> Unit) {
 
     var invitation: Invitation? = null
         private set
     private var deviceToken: String? = null
     private val me get() = invitation!!.id!!
+
+    suspend fun sendNote(note: Note) {
+        send(listOf(SyncOutgoingEvent(listOf(note))))
+    }
 
     private suspend fun identify(event: IdentifyEvent): List<OutgoingEvent> {
         deviceToken = event.device
@@ -65,11 +64,16 @@ class WsSession(val session: DefaultWebSocketServerSession) {
                 clientNote.created = null
                 clientNote.updated = null
                 clientNote.steward = me
-                db.insert(clientNote).toIdAndRev()
+                val newNote = db.insert(clientNote)
+                noteChanged(invitation!!, newNote)
+                newNote.toIdAndRev()
             } else if (clientNote.rev == note.rev) {
                 // todo check if they actually can edit this note
                 note.updateFrom(clientNote)
-                db.update(note).toIdAndRev()
+                val updatedNote = db.update(note)
+                clientNote.rev = updatedNote.rev
+                noteChanged(invitation!!, clientNote)
+                updatedNote.toIdAndRev()
             } else {
                 null
             }
@@ -82,7 +86,7 @@ class WsSession(val session: DefaultWebSocketServerSession) {
         session.outgoing.send(
             Frame.Text(
                 json.encodeToString(
-                    events.map { event -> event.toJsonArrayEvent()}
+                    events.map { event -> event.toJsonArrayEvent() }
                 )
             )
         )
@@ -126,7 +130,7 @@ class Ws {
 
     private val sessions = mutableSetOf<WsSession>()
 
-    fun connect(session: DefaultWebSocketServerSession) = sessions.add(WsSession(session))
+    fun connect(session: DefaultWebSocketServerSession) = sessions.add(WsSession(session, this::noteChanged))
     fun disconnect(session: DefaultWebSocketServerSession) = sessions.removeIf { it.session == session }
 
     fun getSession(invitation: Invitation) = sessions.find { it.invitation?.id == invitation.id!! }
@@ -137,6 +141,19 @@ class Ws {
 
             if (events.isNotEmpty()) {
                 session.send(events)
+            }
+        }
+    }
+
+    private suspend fun noteChanged(invitation: Invitation, note: Note) {
+        db.invitationIdsForNote(note.id!!).let { invitations ->
+            sessions.forEach {
+                if (it.invitation == null
+                    || it.invitation!!.id == invitation.id
+                    || !invitations.contains(it.invitation!!.id)
+                ) return@forEach
+
+                scope.launch { it.sendNote(note) }
             }
         }
     }

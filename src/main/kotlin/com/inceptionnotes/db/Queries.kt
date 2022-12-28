@@ -39,6 +39,21 @@ fun Db.invitationFromDeviceToken(token: String) = one(
     mapOf("token" to token)
 )
 
+fun Db.invitationIdsForNote(note: String) = query(
+    String::class, """
+        for invitation in append(
+            flatten(
+                for v in 0..99 inbound @note graph `${Item::class.graph}`
+                    options { order: 'weighted', uniqueVertices: 'global' }
+                    return v.invitations
+            ),
+            [document(note).steward]
+        )
+            return distinct invitation
+    """.trimIndent(),
+    mapOf("note" to note.asId(Note::class))
+)
+
 fun Db.allNoteRevsByInvitation(invitation: String) = list(
     Note::class, """
         let ids = (

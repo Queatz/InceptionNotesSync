@@ -12,6 +12,7 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.defaultheaders.*
 import io.ktor.server.websocket.*
+import kotlinx.coroutines.CoroutineScope
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
 
@@ -26,6 +27,7 @@ class InvitationPrincipal(
 ) : Principal
 
 fun Application.module() {
+    scope = CoroutineScope(coroutineContext)
     install(Compression) {
         gzip {
             priority = 1.0
