@@ -64,7 +64,7 @@ fun Application.module() {
 }
 
 fun initialize(token: String): Invitation? = if (db.countInvitations == 0) {
-    val invitation = db.insert(Invitation(isSteward = true))
+    val invitation = db.insert(Invitation(token = (0..36).token(), isSteward = true))
     db.insert(Device(token = token, invitation = invitation.id!!))
     invitation
 } else null

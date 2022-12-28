@@ -12,10 +12,16 @@ import io.ktor.server.routing.*
 fun Route.invitationRoutes() {
     authenticate {
         get("/invitations") {
-            respond { db.invitations() }
+            respond {
+                db.invitations().let {
+                    if (me()?.isSteward != true) {
+                        it.onEach { it.token = null }
+                    } else it
+                }
+            }
         }
         post("/invitations") {
-            steward { db.insert(Invitation(token = (0..36).token())) }
+            steward { db.insert(Invitation(token = (0..36).token(), name = genHumanName())) }
         }
         get("/invitations/{id}") {
             respond { db.document(Invitation::class, parameter("id")) ?: HttpStatusCode.NotFound }
@@ -26,7 +32,9 @@ fun Route.invitationRoutes() {
                 val update = call.receive<Invitation>()
 
                 if (update.isSteward != null) {
-                    invitation.isSteward = update.isSteward
+                    if (update.isSteward == true || invitation.id == me()?.id) {
+                        invitation.isSteward = update.isSteward
+                    }
                 }
 
                 if (update.name != null) {
@@ -34,6 +42,18 @@ fun Route.invitationRoutes() {
                 }
 
                 db.update(invitation)
+            }
+        }
+        post("/invitations/{id}/delete") {
+            steward {
+                val invitation = db.document(Invitation::class, parameter("id")) ?: return@steward HttpStatusCode.NotFound
+
+                if (invitation.isSteward == true) {
+                    HttpStatusCode.BadRequest.description("Stewards cannot be removed")
+                } else {
+                    db.delete(invitation)
+                    HttpStatusCode.OK
+                }
             }
         }
     }
