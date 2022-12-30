@@ -11,6 +11,11 @@ import kotlinx.serialization.encodeToString
 
 fun Route.syncRoutes() {
     authenticate {
+        /**
+         * Send websocket events over http.  Useful for large amounts of data.
+         *
+         * Returns websocket events for client consumption.
+         */
         post("http") {
             respondJson {
                 json.encodeToString(

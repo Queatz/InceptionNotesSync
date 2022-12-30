@@ -1,15 +1,20 @@
 package com.inceptionnotes.db
 
+/**
+ * Returns the total number of invitations.
+ */
 val Db.countInvitations get() = query(Int::class, """
     return count(`${Invitation::class.collection}`)
 """.trimIndent()).first()!!
 
-fun Db.invitations() = list(
-    Invitation::class, """
-    for invitation in @@collection return invitation
-""".trimIndent()
-)
+/**
+ * Returns all invitations.
+ */
+fun Db.invitations() = list(Invitation::class, "for invitation in @@collection return invitation")
 
+/**
+ * Returns the invitation with the given token.
+ */
 fun Db.invitationFromToken(token: String) = one(
     Invitation::class, """
     for invitation in @@collection
@@ -19,6 +24,9 @@ fun Db.invitationFromToken(token: String) = one(
     mapOf("token" to token)
 )
 
+/**
+ * Returns the device associated with a device token. Non-null.
+ */
 fun Db.deviceFromToken(token: String) = one(Device::class, """
     upsert { ${f(Device::token)}: @token }
         insert { ${f(Device::token)}: @token, ${f(Device::created)}: DATE_ISO8601(DATE_NOW()) }
@@ -29,6 +37,9 @@ fun Db.deviceFromToken(token: String) = one(Device::class, """
     mapOf("token" to token)
 )!!
 
+/**
+ * Returns the invitation that has been connected to a device token, or null.
+ */
 fun Db.invitationFromDeviceToken(token: String) = one(
     Invitation::class, """
     for device in ${Device::class.collection}
@@ -39,6 +50,9 @@ fun Db.invitationFromDeviceToken(token: String) = one(
     mapOf("token" to token)
 )
 
+/**
+ * Returns the ids of all invitations to this note, including the invitation that created the note, and all invitations to parent notes, up to 99 deep.
+ */
 fun Db.invitationIdsForNote(note: String) = query(
     String::class, """
         for invitation in append(
@@ -54,6 +68,9 @@ fun Db.invitationIdsForNote(note: String) = query(
     mapOf("note" to note.asId(Note::class))
 )
 
+/**
+ * Returns the id and revision of all notes created with the given invitation, or shared with the invitation, including all child notes, up to 99 deep.
+ */
 fun Db.allNoteRevsByInvitation(invitation: String) = list(
     Note::class, """
         let ids = (
