@@ -30,7 +30,7 @@ fun Db.invitationFromToken(token: String) = one(
 fun Db.deviceFromToken(token: String) = one(Device::class, """
     upsert { ${f(Device::token)}: @token }
         insert { ${f(Device::token)}: @token, ${f(Device::created)}: DATE_ISO8601(DATE_NOW()) }
-        update { }
+        update { ${f(Device::updated)}: DATE_ISO8601(DATE_NOW()) }
         in @@collection
         return NEW || OLD
 """.trimIndent(),
@@ -55,13 +55,10 @@ fun Db.invitationFromDeviceToken(token: String) = one(
  */
 fun Db.invitationIdsForNote(note: String) = query(
     String::class, """
-        for invitation in append(
-            flatten(
-                for v in 0..99 inbound @note graph `${Item::class.graph}`
-                    options { order: 'weighted', uniqueVertices: 'global' }
-                    return v.invitations
-            ),
-            [document(note).steward]
+        for invitation in flatten(
+            for v in 0..99 inbound @note graph `${Item::class.graph}`
+                options { order: 'weighted', uniqueVertices: 'global' }
+                return append(v.${f(Note::invitations)}, [v.${f(Note::steward)}])
         )
             return distinct invitation
     """.trimIndent(),
@@ -90,4 +87,39 @@ fun Db.allNoteRevsByInvitation(invitation: String) = list(
             return keep(note, '_rev', '_key')
     """.trimIndent(),
     mapOf("invitation" to invitation)
+)
+
+/**
+ * Inserts items matching the given list into the graph.
+ */
+fun Db.removeObsoleteNoteItems(note: String, items: List<String>) = list(
+    Item::class,
+    """
+    for item in @@collection
+        filter item._from == @note and item._to not in @items
+            remove item in @@collection
+    """.trimIndent(),
+    mapOf(
+        "note" to note.asId(Note::class),
+        "items" to items.map { it.asId(Note::class) }
+    )
+)
+
+/**
+ * Removes items not matching the given list from the graph.
+ */
+fun Db.ensureNoteItems(note: String, items: List<String>) = list(
+    Item::class,
+    """
+    for item in @items
+        upsert { _from: @note, _to: item }
+        insert { _from: @note, _to: item, ${f(Item::created)}: DATE_ISO8601(DATE_NOW()) }
+        update { ${f(Item::updated)}: DATE_ISO8601(DATE_NOW()) }
+        in @@collection
+        return NEW
+    """.trimIndent(),
+    mapOf(
+        "note" to note.asId(Note::class),
+        "items" to items.map { it.asId(Note::class) }
+    )
 )

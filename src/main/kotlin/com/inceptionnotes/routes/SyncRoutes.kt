@@ -18,11 +18,15 @@ fun Route.syncRoutes() {
          */
         post("http") {
             respondJson {
-                json.encodeToString(
-                    ws.getSession(me() ?: return@respondJson HttpStatusCode.NotFound)?.receive(call.receiveText())
-                        ?.map { it.toJsonArrayEvent() }
-                        ?: return@respondJson HttpStatusCode.BadRequest.description("Websocket connection must also be open")
-                )
+                if (me() == null) {
+                    HttpStatusCode.NotFound
+                } else {
+                    json.encodeToString(
+                        ws.getSession(deviceToken)?.receive(call.receiveText())
+                            ?.map { it.toJsonArrayEvent() }
+                            ?: return@respondJson HttpStatusCode.BadRequest.description("Websocket connection must also be open")
+                    )
+                }
             }
         }
     }

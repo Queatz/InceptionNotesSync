@@ -28,7 +28,8 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
 
     var invitation: Invitation? = null
         private set
-    private var deviceToken: String? = null
+    var deviceToken: String? = null
+        private set
     private val me get() = invitation!!.id!!
 
     suspend fun sendNote(note: Note) {
@@ -60,17 +61,13 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
             val note = db.document(Note::class, clientNote.id!!)
 
             if (note == null) {
-                clientNote.rev = null // ensure this gets set by server
-                clientNote.created = null
-                clientNote.updated = null
                 clientNote.steward = me
-                val newNote = db.insert(clientNote)
+                val newNote = notes.insert(clientNote)
                 noteChanged(invitation!!, newNote)
                 newNote.toIdAndRev()
             } else if (clientNote.rev == note.rev) {
                 // todo check if they actually can edit this note
-                note.updateFrom(clientNote)
-                val updatedNote = db.update(note)
+                val updatedNote = notes.update(note, clientNote)
                 clientNote.rev = updatedNote.rev
                 noteChanged(invitation!!, clientNote)
                 updatedNote.toIdAndRev()
@@ -109,23 +106,6 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
     }
 }
 
-private fun Note.updateFrom(referenceNote: Note) {
-    updateAllFrom(
-        referenceNote,
-        Note::invitations,
-        Note::name,
-        Note::description, // todo how to nullify description
-        Note::checked,
-        Note::color,
-        Note::items,
-        Note::ref,
-        Note::options,
-        Note::backgroundUrl,
-        Note::collapsed,
-        Note::estimate
-    )
-}
-
 class Ws {
 
     private val sessions = mutableSetOf<WsSession>()
@@ -133,10 +113,10 @@ class Ws {
     fun connect(session: DefaultWebSocketServerSession) = sessions.add(WsSession(session, this::noteChanged))
     fun disconnect(session: DefaultWebSocketServerSession) = sessions.removeIf { it.session == session }
 
-    fun getSession(invitation: Invitation) = sessions.find { it.invitation?.id == invitation.id!! }
+    fun getSession(deviceToken: String) = sessions.find { it.deviceToken == deviceToken }
 
     suspend fun frame(serverSession: DefaultWebSocketServerSession, text: String) {
-        sessions.first { it.session == serverSession }.let { session ->
+        sessions.firstOrNull { it.session == serverSession }?.let { session ->
             val events = session.receive(text)
 
             if (events.isNotEmpty()) {
@@ -145,16 +125,13 @@ class Ws {
         }
     }
 
-    private suspend fun noteChanged(invitation: Invitation, note: Note) {
-        db.invitationIdsForNote(note.id!!).let { invitations ->
-            sessions.forEach {
-                if (it.invitation == null
-                    || it.invitation!!.id == invitation.id
-                    || !invitations.contains(it.invitation!!.id)
-                ) return@forEach
+    private fun noteChanged(invitation: Invitation, note: Note) {
+        val invitations = db.invitationIdsForNote(note.id!!)
+        sessions.forEach {
+            if (it.invitation == null || it.invitation!!.id == invitation.id || !invitations.contains(it.invitation!!.id)
+            ) return@forEach
 
-                scope.launch { it.sendNote(note) }
-            }
+            scope.launch { it.sendNote(note) }
         }
     }
 }
