@@ -3,6 +3,7 @@ package com.inceptionnotes
 import com.inceptionnotes.db.Invitation
 import com.inceptionnotes.routes.meRoutes
 import com.inceptionnotes.routes.invitationRoutes
+import com.inceptionnotes.routes.noteRoutes
 import com.inceptionnotes.routes.syncRoutes
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -37,6 +38,7 @@ fun Application.routes() {
         meRoutes()
         invitationRoutes()
         syncRoutes()
+        noteRoutes()
     }
 }
 

@@ -66,6 +66,27 @@ fun Db.invitationIdsForNote(note: String) = query(
 )
 
 /**
+ * Returns all invitations to this note, including the invitation that created the note, and all invitations to parent notes, up to 99 deep.
+ */
+fun Db.invitationsForNote(note: String) = list(
+    Invitation::class, """
+        for invitation in flatten(
+            for v in 0..99 inbound @note graph `${Item::class.graph}`
+                options { order: 'weighted', uniqueVertices: 'global' }
+                return append(
+                    (
+                        for x in v.${f(Note::invitations)}
+                            return document(`${Invitation::class.collection}`, x)
+                    ),
+                    [document(`${Invitation::class.collection}`, v.${f(Note::steward)})]
+                )
+        )
+            return distinct invitation
+    """.trimIndent(),
+    mapOf("note" to note.asId(Note::class))
+)
+
+/**
  * Returns the id and revision of all notes created with the given invitation, or shared with the invitation, including all child notes, up to 99 deep.
  */
 fun Db.allNoteRevsByInvitation(invitation: String) = list(
