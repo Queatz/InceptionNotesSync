@@ -25,7 +25,7 @@ inline fun <reified T : OutgoingEvent> T.toJsonArrayEvent() = buildJsonArray {
     add(json.encodeToJsonElement(this@toJsonArrayEvent))
 }
 
-class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: suspend (Invitation, Note) -> Unit) {
+class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: suspend (Invitation, JsonObject) -> Unit) {
 
     var invitation: Invitation? = null
         private set
@@ -33,8 +33,8 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
         private set
     private val me get() = invitation!!.id!!
 
-    suspend fun sendNote(note: Note) {
-        send(listOf(SyncOutgoingEvent(listOf(note))))
+    suspend fun sendNote(jsonObject: JsonObject) {
+        send(listOf(SyncOutgoingEvent(listOf(jsonObject))))
     }
 
     private suspend fun identify(event: IdentifyEvent): List<OutgoingEvent> {
@@ -54,6 +54,7 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
         val stateDiff = db.allNoteRevsByInvitation(me)
             .filter { clientState[it.id]?.rev != it.rev }
             .mapNotNull { db.document(Note::class, it.id!!) }
+            .map { json.encodeToJsonElement(it).jsonObject }
         return listOf(SyncOutgoingEvent(stateDiff, full = true))
     }
 
@@ -64,19 +65,23 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
     }
 
     private suspend fun sync(event: SyncEvent): List<OutgoingEvent> {
-        val state = event.notes.mapNotNull { clientNote ->
+        val state = event.notes.mapNotNull { jsonObject ->
+            val clientNote = json.decodeFromJsonElement<Note>(jsonObject)
             val note = db.document(Note::class, clientNote.id!!)
 
             if (note == null) {
                 clientNote.steward = me
                 val newNote = notes.insert(clientNote)
-                noteChanged(invitation!!, newNote)
+                noteChanged(invitation!!, json.encodeToJsonElement(newNote).jsonObject)
                 newNote.toIdAndRev()
             } else if (clientNote.rev == note.rev) {
                 // todo check if they actually can edit this note
-                val updatedNote = notes.update(note, clientNote)
-                clientNote.rev = updatedNote.rev
-                noteChanged(invitation!!, clientNote)
+                val updatedNote = notes.update(note, clientNote, jsonObject)
+                noteChanged(invitation!!, json.encodeToJsonElement(
+                    jsonObject.toMutableMap().also {
+                        it["rev"] = json.parseToJsonElement(updatedNote.rev!!)
+                    }
+                ).jsonObject)
                 updatedNote.toIdAndRev()
             } else {
                 null
@@ -116,7 +121,7 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
 
 class Ws {
 
-    private val sessions = mutableSetOf<WsSession>()
+    private val sessions = synchronized(this) { mutableSetOf<WsSession>() }
 
     fun connect(session: DefaultWebSocketServerSession) = sessions.add(WsSession(session, this::noteChanged))
     fun disconnect(session: DefaultWebSocketServerSession) = sessions.removeIf { it.session == session }
@@ -133,13 +138,13 @@ class Ws {
         }
     }
 
-    private fun noteChanged(invitation: Invitation, note: Note) {
-        val invitations = db.invitationIdsForNote(note.id!!)
+    private fun noteChanged(invitation: Invitation, jsonObject: JsonObject) {
+        val invitations = db.invitationIdsForNote(jsonObject["id"]!!.jsonPrimitive.content)
         sessions.forEach {
             if (it.invitation == null || it.invitation!!.id == invitation.id || !invitations.contains(it.invitation!!.id)
             ) return@forEach
 
-            scope.launch { it.sendNote(note) }
+            scope.launch { it.sendNote(jsonObject) }
         }
     }
 }

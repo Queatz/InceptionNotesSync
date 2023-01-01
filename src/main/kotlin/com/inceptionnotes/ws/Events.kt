@@ -3,6 +3,7 @@ package com.inceptionnotes.ws
 import com.inceptionnotes.db.Invitation
 import com.inceptionnotes.db.Note
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 typealias IdAndRev = List<String>
 val IdAndRev.id get() = get(0)
@@ -31,7 +32,7 @@ data class StateEvent(
 
 @Serializable
 data class SyncEvent(
-    val notes: List<Note>
+    val notes: List<JsonObject>
 ) : IncomingEvent() {
     companion object {
         const val ACTION = "sync"
@@ -58,7 +59,7 @@ data class IdentifyOutgoingEvent(
 
 @Serializable
 data class SyncOutgoingEvent(
-    val notes: List<Note>,
+    val notes: List<JsonObject>,
     val full: Boolean? = null
 ) : OutgoingEvent() {
     companion object {

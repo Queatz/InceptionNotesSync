@@ -5,6 +5,9 @@ import com.inceptionnotes.db.Note
 import com.inceptionnotes.db.ensureNoteItems
 import com.inceptionnotes.db.removeObsoleteNoteItems
 import com.inceptionnotes.updateAllFrom
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonNull
 
 class Notes {
     fun insert(note: Note): Note {
@@ -25,8 +28,9 @@ class Notes {
         return newNote
     }
 
-    fun update(note: Note, referenceNote: Note): Note {
+    fun update(note: Note, referenceNote: Note, jsonObject: JsonObject): Note {
         note.updateFrom(referenceNote)
+        if (jsonObject["description"] is JsonNull) note.description = null
         val updatedNote = db.update(note)
         if (referenceNote.items != null) {
             updateNoteGraph(updatedNote)
@@ -45,7 +49,7 @@ private fun Note.updateFrom(referenceNote: Note) {
         referenceNote,
         Note::invitations,
         Note::name,
-        Note::description, // todo how to nullify description
+        Note::description,
         Note::checked,
         Note::color,
         Note::items,
