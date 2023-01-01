@@ -1,8 +1,8 @@
 package com.inceptionnotes.routes
 
 import com.inceptionnotes.*
-import com.inceptionnotes.db.Invitation
-import com.inceptionnotes.db.invitations
+import com.inceptionnotes.db.*
+import com.inceptionnotes.ws.sync
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -75,6 +75,10 @@ fun Route.invitationRoutes() {
                     HttpStatusCode.BadRequest.description("Stewards cannot be removed")
                 } else {
                     db.delete(invitation)
+                    db.removeDevicesByInvitation(invitation.id!!)
+                    db.removeInvitationFromAllNotes(invitation.id!!).forEach {
+                        ws.noteChanged(null, it.sync(Note::invitations))
+                    }
                     HttpStatusCode.OK
                 }
             }

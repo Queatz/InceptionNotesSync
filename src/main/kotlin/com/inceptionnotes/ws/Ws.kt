@@ -7,6 +7,7 @@ import io.ktor.websocket.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import kotlin.reflect.KMutableProperty1
 
 val actions = mapOf(
     IdentifyOutgoingEvent::class to IdentifyOutgoingEvent.ACTION,
@@ -138,13 +139,37 @@ class Ws {
         }
     }
 
-    private fun noteChanged(invitation: Invitation, jsonObject: JsonObject) {
+    fun noteChanged(invitation: Invitation?, jsonObject: JsonObject) {
         val invitations = db.invitationIdsForNote(jsonObject["id"]!!.jsonPrimitive.content)
         sessions.forEach {
-            if (it.invitation == null || it.invitation!!.id == invitation.id || !invitations.contains(it.invitation!!.id)
+            if (it.invitation == null || it.invitation!!.id == invitation?.id || !invitations.contains(it.invitation!!.id)
             ) return@forEach
 
             scope.launch { it.sendNote(jsonObject) }
+        }
+    }
+}
+
+fun Note.sync(vararg fields: KMutableProperty1<Note, *>) = buildJsonObject {
+    put(f(Note::id), id)
+    put(f(Note::rev), rev)
+    fields.forEach {
+        when (it) {
+            Note::invitations -> json.encodeToJsonElement(invitations)
+            Note::steward -> json.encodeToJsonElement(steward)
+            Note::name -> json.encodeToJsonElement(name)
+            Note::description -> json.encodeToJsonElement(description)
+            Note::checked -> json.encodeToJsonElement(checked)
+            Note::color -> json.encodeToJsonElement(color)
+            Note::items -> json.encodeToJsonElement(items)
+            Note::ref -> json.encodeToJsonElement(ref)
+            Note::options -> json.encodeToJsonElement(options)
+            Note::backgroundUrl -> json.encodeToJsonElement(backgroundUrl)
+            Note::collapsed -> json.encodeToJsonElement(collapsed)
+            Note::estimate -> json.encodeToJsonElement(estimate)
+            else -> null
+        }?.let { value ->
+            put(it.name, value)
         }
     }
 }

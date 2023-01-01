@@ -144,3 +144,18 @@ fun Db.ensureNoteItems(note: String, items: List<String>) = list(
         "items" to items.map { it.asId(Note::class) }
     )
 )
+
+fun Db.removeDevicesByInvitation(invitation: String) = query(Unit::class, """
+    for device in ${Device::class.collection}
+        filter device.${f(Device::invitation)} == @invitation
+        remove device in ${Device::class.collection}
+""".trimIndent(), mapOf("invitation" to invitation)
+)
+
+fun Db.removeInvitationFromAllNotes(invitation: String) = list(Note::class, """
+    for note in @@collection
+        filter @invitation in note.${f(Note::invitations)}
+        update { _key: note._key, ${f(Note::invitations)}: remove_value(note.${f(Note::invitations)}, @invitation) } in @@collection
+        return NEW
+""".trimIndent(), mapOf("invitation" to invitation)
+)
