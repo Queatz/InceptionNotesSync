@@ -39,6 +39,15 @@ data class SyncEvent(
 }
 
 @Serializable
+data class GetEvent(
+    val notes: List<String>
+) : IncomingEvent() {
+    companion object {
+        const val ACTION = "get"
+    }
+}
+
+@Serializable
 data class IdentifyOutgoingEvent(
     val invitation: Invitation
 ) : OutgoingEvent() {
@@ -49,10 +58,20 @@ data class IdentifyOutgoingEvent(
 
 @Serializable
 data class SyncOutgoingEvent(
-    val notes: List<Note>
+    val notes: List<Note>,
+    val full: Boolean? = null
 ) : OutgoingEvent() {
     companion object {
         const val ACTION = "sync"
+    }
+}
+
+@Serializable
+data class GetOutgoingEvent(
+    val notes: List<Note>
+) : OutgoingEvent() {
+    companion object {
+        const val ACTION = "get"
     }
 }
 

@@ -57,14 +57,14 @@ fun Application.module() {
         }
     }
     install(WebSockets) {
-        pingPeriod = 15.seconds.toJavaDuration()
-        timeout = 30.seconds.toJavaDuration()
+//        pingPeriod = 15.seconds.toJavaDuration()
+//        timeout = 30.seconds.toJavaDuration()
     }
     routes()
 }
 
 fun initialize(token: String): Invitation? = if (db.countInvitations == 0) {
-    val invitation = db.insert(Invitation(token = (0..36).token(), isSteward = true))
+    val invitation = db.insert(Invitation(name = "Steward", token = (0..36).token(), isSteward = true))
     db.insert(Device(token = token, invitation = invitation.id!!))
     invitation
 } else null

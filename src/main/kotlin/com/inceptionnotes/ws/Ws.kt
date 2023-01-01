@@ -12,6 +12,7 @@ val actions = mapOf(
     IdentifyOutgoingEvent::class to IdentifyOutgoingEvent.ACTION,
     SyncOutgoingEvent::class to SyncOutgoingEvent.ACTION,
     StateOutgoingEvent::class to StateOutgoingEvent.ACTION,
+    GetOutgoingEvent::class to GetOutgoingEvent.ACTION,
 )
 
 inline fun <reified T : OutgoingEvent> T.toJsonArrayEvent() = buildJsonArray {
@@ -53,7 +54,13 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
         val stateDiff = db.allNoteRevsByInvitation(me)
             .filter { clientState[it.id]?.rev != it.rev }
             .mapNotNull { db.document(Note::class, it.id!!) }
-        return listOf(SyncOutgoingEvent(stateDiff))
+        return listOf(SyncOutgoingEvent(stateDiff, full = true))
+    }
+
+    private suspend fun get(event: GetEvent): List<OutgoingEvent> {
+        return listOf(GetOutgoingEvent(event.notes.mapNotNull {
+            db.document(Note::class, it) // todo ensure they have access
+        }))
     }
 
     private suspend fun sync(event: SyncEvent): List<OutgoingEvent> {
@@ -97,6 +104,7 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
                     IdentifyEvent.ACTION -> identify(json.decodeFromJsonElement(element))
                     StateEvent.ACTION -> state(json.decodeFromJsonElement(element))
                     SyncEvent.ACTION -> sync(json.decodeFromJsonElement(element))
+                    GetEvent.ACTION -> get(json.decodeFromJsonElement(element))
                     else -> {
                         logger.warn("$text does not contain a known action")
                         emptyList()
