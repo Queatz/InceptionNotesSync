@@ -2,7 +2,7 @@ package com.inceptionnotes.routes
 
 import com.inceptionnotes.*
 import com.inceptionnotes.db.*
-import com.inceptionnotes.ws.sync
+import com.inceptionnotes.ws.syncJsonObject
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -77,7 +77,7 @@ fun Route.invitationRoutes() {
                     db.delete(invitation)
                     db.removeDevicesByInvitation(invitation.id!!)
                     db.removeInvitationFromAllNotes(invitation.id!!).forEach {
-                        ws.noteChanged(null, it.sync(Note::invitations))
+                        ws.noteChanged(null, it.syncJsonObject(Note::invitations))
                     }
                     HttpStatusCode.OK
                 }

@@ -5,6 +5,8 @@ import com.inceptionnotes.db.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.reflect.KMutableProperty1
@@ -66,16 +68,19 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
     }
 
     private suspend fun sync(event: SyncEvent): List<OutgoingEvent> {
+        val syncEvents = mutableListOf<OutgoingEvent>()
         val state = event.notes.mapNotNull { jsonObject ->
             val clientNote = json.decodeFromJsonElement<Note>(jsonObject)
             val note = db.document(Note::class, clientNote.id!!)
+            val oldRev = clientNote.rev
 
             if (note == null) {
                 clientNote.steward = me
                 val newNote = notes.insert(clientNote)
+                syncEvents.add(SyncOutgoingEvent(listOf(newNote.syncJsonObject(Note::steward))))
                 noteChanged(invitation!!, json.encodeToJsonElement(newNote).jsonObject)
-                newNote.toIdAndRev()
-            } else if (clientNote.rev == note.rev) {
+                newNote.toIdAndRev(oldRev)
+            } else if (oldRev == note.rev) {
                 // todo check if they actually can edit this note
                 val updatedNote = notes.update(note, clientNote, jsonObject)
                 noteChanged(invitation!!, json.encodeToJsonElement(
@@ -83,7 +88,7 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
                         it["rev"] = json.parseToJsonElement(updatedNote.rev!!)
                     }
                 ).jsonObject)
-                updatedNote.toIdAndRev()
+                updatedNote.toIdAndRev(oldRev)
             } else {
                 null
             }
@@ -122,15 +127,24 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
 
 class Ws {
 
-    private val sessions = synchronized(this) { mutableSetOf<WsSession>() }
+    private val mutex = Mutex()
+    private val sessions = mutableSetOf<WsSession>()
 
-    fun connect(session: DefaultWebSocketServerSession) = sessions.add(WsSession(session, this::noteChanged))
-    fun disconnect(session: DefaultWebSocketServerSession) = sessions.removeIf { it.session == session }
+    suspend fun connect(session: DefaultWebSocketServerSession) {
+        mutex.withLock {
+            sessions.add(WsSession(session, this::noteChanged))
+        }
+    }
+    suspend fun disconnect(session: DefaultWebSocketServerSession) {
+        mutex.withLock {
+            sessions.removeIf { it.session == session }
+        }
+    }
 
     fun getSession(deviceToken: String) = sessions.find { it.deviceToken == deviceToken }
 
     suspend fun frame(serverSession: DefaultWebSocketServerSession, text: String) {
-        sessions.firstOrNull { it.session == serverSession }?.let { session ->
+        sessions.find { it.session == serverSession }?.let { session ->
             val events = session.receive(text)
 
             if (events.isNotEmpty()) {
@@ -150,7 +164,7 @@ class Ws {
     }
 }
 
-fun Note.sync(vararg fields: KMutableProperty1<Note, *>) = buildJsonObject {
+fun Note.syncJsonObject(vararg fields: KMutableProperty1<Note, *>) = buildJsonObject {
     put(f(Note::id), id)
     put(f(Note::rev), rev)
     fields.forEach {
@@ -169,6 +183,7 @@ fun Note.sync(vararg fields: KMutableProperty1<Note, *>) = buildJsonObject {
             Note::estimate -> json.encodeToJsonElement(estimate)
             else -> null
         }?.let { value ->
+            // todo instead of it.name it should be the json name of the field
             put(it.name, value)
         }
     }

@@ -1,6 +1,9 @@
 package com.inceptionnotes
 
-import com.inceptionnotes.db.*
+import com.inceptionnotes.db.Device
+import com.inceptionnotes.db.Invitation
+import com.inceptionnotes.db.countInvitations
+import com.inceptionnotes.db.invitationFromDeviceToken
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -57,14 +60,14 @@ fun Application.module() {
         }
     }
     install(WebSockets) {
-//        pingPeriod = 15.seconds.toJavaDuration()
-//        timeout = 30.seconds.toJavaDuration()
+        pingPeriod = 15.seconds.toJavaDuration()
+        timeout = 30.seconds.toJavaDuration()
     }
     routes()
 }
 
 fun initialize(token: String): Invitation? = if (db.countInvitations == 0) {
-    val invitation = db.insert(Invitation(name = "Steward", token = (0..36).token(), isSteward = true))
+    val invitation = db.insert(Invitation(name = "Server Steward", token = (0..36).token(), isSteward = true))
     db.insert(Device(token = token, invitation = invitation.id!!))
     invitation
 } else null
