@@ -8,6 +8,7 @@ import com.arangodb.model.CollectionCreateOptions
 import com.arangodb.model.DocumentCreateOptions
 import com.arangodb.model.DocumentUpdateOptions
 import com.arangodb.model.PersistentIndexOptions
+import com.arangodb.velocypack.annotations.SerializedName
 import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.DeserializationContext
@@ -18,9 +19,11 @@ import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.databind.module.SimpleSerializers
 import com.fasterxml.jackson.databind.ser.std.StdSerializer
 import com.fasterxml.jackson.module.kotlin.KotlinModule
+import com.inceptionnotes.json
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toJavaInstant
+import kotlinx.serialization.encodeToString
 import java.io.IOException
 import java.time.format.DateTimeFormatter
 import kotlin.reflect.KClass
@@ -179,6 +182,7 @@ val <T : Model> KClass<T>.collection get() = simpleName!!.lowercase()
 val <T : Model> KClass<T>.graph get() = "${collection}-graph"
 
 fun f(property: KProperty<*>) = property.name
+inline fun <reified T : Any> v(value: T) = json.encodeToString(value)
 
 fun ArangoCollection.index(vararg fields: KProperty<*>, options: PersistentIndexOptions = PersistentIndexOptions()) {
     ensurePersistentIndex(fields.toList().map { f(it) }, options)

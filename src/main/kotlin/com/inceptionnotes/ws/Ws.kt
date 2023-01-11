@@ -54,16 +54,19 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
 
     private suspend fun state(event: StateEvent): List<OutgoingEvent> {
         val clientState = event.notes.associateBy { it.id }
-        val stateDiff = db.allNoteRevsByInvitation(me)
+        val all = db.allNoteRevsByInvitation(me)
+        val allIds = all.map { it.id }.toSet()
+        val stateDiff = all
             .filter { clientState[it.id]?.rev != it.rev }
             .mapNotNull { db.document(Note::class, it.id!!) }
             .map { json.encodeToJsonElement(it).jsonObject }
-        return listOf(SyncOutgoingEvent(stateDiff, full = true))
+        val gone = clientState.keys.filter { !allIds.contains(it) }
+        return listOf(SyncOutgoingEvent(stateDiff, gone = gone, full = true))
     }
 
     private suspend fun get(event: GetEvent): List<OutgoingEvent> {
         return listOf(GetOutgoingEvent(event.notes.mapNotNull {
-            db.document(Note::class, it) // todo ensure they have access
+            if (notes.canView(me, it)) db.document(Note::class, it) else null
         }))
     }
 
@@ -75,13 +78,14 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
             val oldRev = clientNote.rev
 
             if (note == null) {
-                clientNote.steward = me
+                if (clientNote.steward == null) {
+                    clientNote.steward = me
+                }
                 val newNote = notes.insert(clientNote)
                 syncEvents.add(SyncOutgoingEvent(listOf(newNote.syncJsonObject(Note::steward))))
                 noteChanged(invitation!!, json.encodeToJsonElement(newNote).jsonObject)
                 newNote.toIdAndRev(oldRev)
-            } else if (oldRev == note.rev) {
-                // todo check if they actually can edit this note
+            } else if (oldRev == note.rev && notes.canEdit(me, note)) {
                 val updatedNote = notes.update(note, clientNote, jsonObject)
                 noteChanged(invitation!!, json.encodeToJsonElement(
                     jsonObject.toMutableMap().also {
@@ -154,7 +158,7 @@ class Ws {
     }
 
     fun noteChanged(invitation: Invitation?, jsonObject: JsonObject) {
-        val invitations = db.invitationIdsForNote(jsonObject["id"]!!.jsonPrimitive.content)
+        val invitations = db.invitationIdsForNote(jsonObject["id"]!!.jsonPrimitive.content, true)
         sessions.forEach {
             if (it.invitation == null || it.invitation!!.id == invitation?.id || !invitations.contains(it.invitation!!.id)
             ) return@forEach

@@ -53,11 +53,13 @@ fun Db.invitationFromDeviceToken(token: String) = one(
 /**
  * Returns the ids of all invitations to this note, including the invitation that created the note, and all invitations to parent notes, up to 99 deep.
  */
-fun Db.invitationIdsForNote(note: String) = query(
+fun Db.invitationIdsForNote(note: String, includeRefs: Boolean = false) = query(
     String::class, """
         for invitation in flatten(
-            for v in 0..99 inbound @note graph `${Item::class.graph}`
+            for v, e in 0..99 inbound @note graph `${Item::class.graph}`
+                prune found = ${if (includeRefs) "e._to != @note and" else ""} e.${f(Item::link)} == ${v(ItemLink.Ref)} // stop at refs
                 options { order: 'weighted', uniqueVertices: 'global' }
+                ${if (includeRefs) "" else "filter not found"}
                 return append(v.${f(Note::invitations)}, [v.${f(Note::steward)}])
         )
             return distinct invitation
@@ -68,11 +70,13 @@ fun Db.invitationIdsForNote(note: String) = query(
 /**
  * Returns all invitations to this note, including the invitation that created the note, and all invitations to parent notes, up to 99 deep.
  */
-fun Db.invitationsForNote(note: String) = list(
+fun Db.invitationsForNote(note: String, includeRefs: Boolean = false) = list(
     Invitation::class, """
         for invitation in flatten(
-            for v in 0..99 inbound @note graph `${Item::class.graph}`
+            for v, e in 0..99 inbound @note graph `${Item::class.graph}`
+                prune found = ${if (includeRefs) "e._to != @note and" else ""} e.${f(Item::link)} == ${v(ItemLink.Ref)} // stop at refs
                 options { order: 'weighted', uniqueVertices: 'global' }
+                ${if (includeRefs) "" else "filter not found"}
                 return append(
                     (
                         for x in v.${f(Note::invitations)}
@@ -88,23 +92,28 @@ fun Db.invitationsForNote(note: String) = list(
 
 /**
  * Returns the id and revision of all notes created with the given invitation, or shared with the invitation, including all child notes, up to 99 deep.
+ *
+ * Includes refs
  */
 fun Db.allNoteRevsByInvitation(invitation: String) = list(
     Note::class, """
+        // find all notes with an invitation
         let ids = (
             for note in @@collection
                 filter note.${f(Note::steward)} == @invitation
                         or @invitation in note.${f(Note::invitations)}
                     return note._id
         )
+        // find all notes under any of those notes
         for note in @@collection
-            filter first(
-                for v in 0..99 inbound note graph `${Item::class.graph}`
-                    prune found = v._id in ids
+            filter note._id in ids or first(
+                for v, e in 1..99 inbound note graph `${Item::class.graph}`
+                    prune stop = v._id in ids or (e._to != note._id and e.${f(Item::link)} == ${v(ItemLink.Ref)}) // stop at refs
                     options { order: 'weighted', uniqueVertices: 'global' }
-                    filter found
-                    return v
-            ) != null
+                    filter stop and v._id in ids
+                    limit 1
+                    return true
+            ) == true
             return keep(note, '_rev', '_key')
     """.trimIndent(),
     mapOf("invitation" to invitation)
@@ -113,35 +122,42 @@ fun Db.allNoteRevsByInvitation(invitation: String) = list(
 /**
  * Inserts items matching the given list into the graph.
  */
-fun Db.removeObsoleteNoteItems(note: String, items: List<String>) = list(
+fun Db.removeObsoleteNoteItems(note: String, items: List<String>, ref: List<String>) = list(
     Item::class,
     """
     for item in @@collection
-        filter item._from == @note and item._to not in @items
+        filter item._from == @note
+            and (
+                (item.${f(Item::link)} == ${v(ItemLink.Item)} and item._to not in @items)
+                or (item.${f(Item::link)} == ${v(ItemLink.Ref)} and item._to not in @ref)
+            )
             remove item in @@collection
     """.trimIndent(),
     mapOf(
         "note" to note.asId(Note::class),
-        "items" to items.map { it.asId(Note::class) }
+        "items" to items.map { it.asId(Note::class) },
+        "ref" to ref.map { it.asId(Note::class) }
     )
 )
 
 /**
  * Removes items not matching the given list from the graph.
  */
-fun Db.ensureNoteItems(note: String, items: List<String>) = list(
+fun Db.ensureNoteItems(note: String, items: List<String>, ref: List<String>) = list(
     Item::class,
     """
-    for item in @items
-        upsert { _from: @note, _to: item }
-        insert { _from: @note, _to: item, ${f(Item::created)}: DATE_ISO8601(DATE_NOW()) }
-        update { ${f(Item::updated)}: DATE_ISO8601(DATE_NOW()) }
-        in @@collection
-        return NEW
+    for link in [[${v(ItemLink.Item)}, @items], [${v(ItemLink.Ref)}, @ref]]
+        for item in link[1]
+            upsert { _from: @note, _to: item, ${f(Item::link)}: link[0] }
+                insert { _from: @note, _to: item, ${f(Item::link)}: link[0], ${f(Item::created)}: DATE_ISO8601(DATE_NOW()) }
+                update { ${f(Item::updated)}: DATE_ISO8601(DATE_NOW()) }
+                in @@collection
+                return NEW
     """.trimIndent(),
     mapOf(
         "note" to note.asId(Note::class),
-        "items" to items.map { it.asId(Note::class) }
+        "items" to items.map { it.asId(Note::class) },
+        "ref" to ref.map { it.asId(Note::class) }
     )
 )
 

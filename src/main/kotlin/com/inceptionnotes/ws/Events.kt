@@ -60,6 +60,7 @@ data class IdentifyOutgoingEvent(
 @Serializable
 data class SyncOutgoingEvent(
     val notes: List<JsonObject>,
+    val gone: List<String>? = null,
     val full: Boolean? = null
 ) : OutgoingEvent() {
     companion object {

@@ -1,9 +1,8 @@
 package com.inceptionnotes.routes
 
-import com.inceptionnotes.db
+import com.inceptionnotes.*
 import com.inceptionnotes.db.invitationsForNote
-import com.inceptionnotes.parameter
-import com.inceptionnotes.respond
+import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
 
@@ -14,8 +13,13 @@ fun Route.noteRoutes() {
          */
         get("/note/{id}/invitations") {
             respond {
-                // todo check that they can see this note
-                db.invitationsForNote(parameter("id"))
+                val note = parameter("id")
+                val me = me()
+                if (me == null || !notes.canEdit(me.id!!, note)) {
+                    HttpStatusCode.NotFound
+                } else {
+                    db.invitationsForNote(note)
+                }
             }
         }
     }

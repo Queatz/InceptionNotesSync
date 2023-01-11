@@ -3,11 +3,11 @@ package com.inceptionnotes.app
 import com.inceptionnotes.db
 import com.inceptionnotes.db.Note
 import com.inceptionnotes.db.ensureNoteItems
+import com.inceptionnotes.db.invitationsForNote
 import com.inceptionnotes.db.removeObsoleteNoteItems
 import com.inceptionnotes.updateAllFrom
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonNull
 
 class Notes {
     fun insert(note: Note): Note {
@@ -32,16 +32,36 @@ class Notes {
         note.updateFrom(referenceNote)
         if (jsonObject["description"] is JsonNull) note.description = null
         val updatedNote = db.update(note)
-        if (referenceNote.items != null) {
+        if (referenceNote.items != null || referenceNote.ref != null) {
             updateNoteGraph(updatedNote)
         }
         return updatedNote
     }
 
     private fun updateNoteGraph(note: Note) {
-        db.removeObsoleteNoteItems(note.id!!, note.items!!)
-        db.ensureNoteItems(note.id!!, note.items!!)
+        db.removeObsoleteNoteItems(note.id!!, note.items!!, note.ref!!)
+        db.ensureNoteItems(note.id!!, note.items!!, note.ref!!)
     }
+
+    fun canEdit(invitation: String, note: Note): Boolean {
+        return if (note.steward == invitation || note.invitations?.contains(invitation) == true) {
+            true
+        } else db.invitationsForNote(note.id!!).any { it.id == invitation }
+    }
+
+    fun canEdit(invitation: String, note: String): Boolean {
+        return if (db.invitationsForNote(note).any { it.id == invitation })
+            true
+        else steward(note) == invitation
+    }
+
+    fun canView(invitation: String, note: String): Boolean {
+        return if (db.invitationsForNote(note, true).any { it.id == invitation })
+            true
+        else steward(note) == invitation
+    }
+
+    fun steward(note: String) = db.document(Note::class, note)?.steward
 }
 
 private fun Note.updateFrom(referenceNote: Note) {
