@@ -78,6 +78,15 @@ data class GetOutgoingEvent(
 }
 
 @Serializable
+data class InvitationOutgoingEvent(
+    val reload: Boolean = true
+) : OutgoingEvent() {
+    companion object {
+        const val ACTION = "invitation"
+    }
+}
+
+@Serializable
 data class StateOutgoingEvent(
     val notes: List<IdAndRev>
 ) : OutgoingEvent() {

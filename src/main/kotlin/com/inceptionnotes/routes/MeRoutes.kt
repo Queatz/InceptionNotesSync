@@ -1,12 +1,9 @@
 package com.inceptionnotes.routes
 
-import com.inceptionnotes.InvitationPrincipal
-import com.inceptionnotes.db
+import com.inceptionnotes.*
 import com.inceptionnotes.db.Invitation
 import com.inceptionnotes.db.deviceFromToken
 import com.inceptionnotes.db.invitationFromToken
-import com.inceptionnotes.me
-import com.inceptionnotes.respond
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -38,7 +35,9 @@ fun Route.meRoutes() {
 
                 if (event.name != null) {
                     invitation.name = event.name!!.take(64)
-                    return@respond db.update(invitation)
+                    return@respond db.update(invitation).also {
+                        ws.invitationsChanged(me())
+                    }
                 }
 
                 return@respond HttpStatusCode.BadRequest

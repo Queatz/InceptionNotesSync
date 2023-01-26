@@ -11,7 +11,6 @@ fun IntRange.token() =
 
 val Any.logger get() = LoggerFactory.getLogger(this::class.java)!!
 
-
 inline fun <reified T : Any> T.updateAllFrom(reference: T, vararg fields: KMutableProperty1<T, *>) {
     for (field in fields) {
         updateFrom(reference, field)

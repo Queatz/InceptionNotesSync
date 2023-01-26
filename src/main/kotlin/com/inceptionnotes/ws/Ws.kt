@@ -16,6 +16,7 @@ val actions = mapOf(
     SyncOutgoingEvent::class to SyncOutgoingEvent.ACTION,
     StateOutgoingEvent::class to StateOutgoingEvent.ACTION,
     GetOutgoingEvent::class to GetOutgoingEvent.ACTION,
+    InvitationOutgoingEvent::class to InvitationOutgoingEvent.ACTION,
 )
 
 inline fun <reified T : OutgoingEvent> T.toJsonArrayEvent() = buildJsonArray {
@@ -164,6 +165,14 @@ class Ws {
             ) return@forEach
 
             scope.launch { it.sendNote(jsonObject) }
+        }
+    }
+
+    fun invitationsChanged(changedBy: Invitation?) {
+        val event = listOf(InvitationOutgoingEvent())
+        sessions.forEach {
+            if (it.invitation == null || changedBy == it.invitation) return@forEach
+            scope.launch { it.send(event) }
         }
     }
 }

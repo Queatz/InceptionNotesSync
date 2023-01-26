@@ -108,7 +108,7 @@ fun Db.allNoteRevsByInvitation(invitation: String) = list(
         for note in @@collection
             filter note._id in ids or first(
                 for v, e in 1..99 inbound note graph `${Item::class.graph}`
-                    prune stop = v._id in ids or (e._to != note._id and e.${f(Item::link)} == ${v(ItemLink.Ref)}) // stop at refs
+                    prune stop = v._id in ids or (e._to != note._id and e.${f(Item::link)} == ${v(ItemLink.Ref)}) // stop at refs except initial link (note might be a ref)
                     options { order: 'weighted', uniqueVertices: 'global' }
                     filter stop and v._id in ids
                     limit 1

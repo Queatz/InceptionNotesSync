@@ -28,7 +28,11 @@ fun Route.invitationRoutes() {
          * Server stewards only. Create an invitation.
          */
         post("/invitations") {
-            steward { db.insert(Invitation(token = (0..36).token(), name = genHumanName())) }
+            steward {
+                db.insert(Invitation(token = (0..36).token(), name = genHumanName())).also {
+                    ws.invitationsChanged(me())
+                }
+            }
         }
 
         /**
@@ -60,7 +64,9 @@ fun Route.invitationRoutes() {
                     invitation.name = update.name
                 }
 
-                db.update(invitation)
+                db.update(invitation).also {
+                    ws.invitationsChanged(me())
+                }
             }
         }
 
@@ -79,6 +85,7 @@ fun Route.invitationRoutes() {
                     db.removeInvitationFromAllNotes(invitation.id!!).forEach {
                         ws.noteChanged(null, it.syncJsonObject(Note::invitations))
                     }
+                    ws.invitationsChanged(me())
                     HttpStatusCode.OK
                 }
             }
