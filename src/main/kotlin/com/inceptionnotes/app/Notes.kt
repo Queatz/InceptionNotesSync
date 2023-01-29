@@ -1,10 +1,7 @@
 package com.inceptionnotes.app
 
 import com.inceptionnotes.db
-import com.inceptionnotes.db.Note
-import com.inceptionnotes.db.ensureNoteItems
-import com.inceptionnotes.db.invitationsForNote
-import com.inceptionnotes.db.removeObsoleteNoteItems
+import com.inceptionnotes.db.*
 import com.inceptionnotes.updateAllFrom
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -39,6 +36,10 @@ class Notes {
             updateNoteGraph(updatedNote)
         }
         return updatedNote
+    }
+
+    fun ensureBidirectionalNoteRefs(notes: List<String>): List<Note> {
+        return db.ensureBidirectionalNoteRefs(notes) + db.updateNoteRefs(notes)
     }
 
     private fun updateNoteGraph(note: Note) {

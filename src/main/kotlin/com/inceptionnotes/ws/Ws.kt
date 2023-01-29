@@ -29,7 +29,7 @@ inline fun <reified T : OutgoingEvent> T.toJsonArrayEvent() = buildJsonArray {
     add(json.encodeToJsonElement(this@toJsonArrayEvent))
 }
 
-class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: suspend (Invitation, JsonObject) -> Unit) {
+class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: suspend (Invitation?, JsonObject) -> Unit) {
 
     var invitation: Invitation? = null
         private set
@@ -100,6 +100,10 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
             }
         }
 
+        notes.ensureBidirectionalNoteRefs(state.map { it.id }).forEach { updatedNote ->
+            noteChanged(null, updatedNote.syncJsonObject(Note::ref))
+        }
+
         return if (state.isEmpty()) emptyList() else listOf(StateOutgoingEvent(state))
     }
 
@@ -141,6 +145,7 @@ class Ws {
             sessions.add(WsSession(session, this::noteChanged))
         }
     }
+
     suspend fun disconnect(session: DefaultWebSocketServerSession) {
         mutex.withLock {
             sessions.removeIf { it.session == session }

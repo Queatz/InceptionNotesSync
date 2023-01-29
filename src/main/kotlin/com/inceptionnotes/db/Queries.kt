@@ -152,6 +152,56 @@ fun Db.removeObsoleteNoteItems(note: String, items: List<String>, ref: List<Stri
 )
 
 /**
+ * Appends any missing refs to [these notes] that are missing on the other notes
+ */
+fun Db.ensureBidirectionalNoteRefs(notes: List<String>? = null) = list(
+    Note::class,
+    """
+    for note in @@collection
+        ${notes?.let { "filter note._key in @notes" }}
+        for ref in note.${f(Note::ref)}
+            let n = document(@@collection, ref)
+            filter n != null and note._key not in n.${f(Note::ref)}
+            update {
+                _key: n._key,
+                ${f(Note::ref)}: append(n.${f(Note::ref)} || [], [note._key], true),
+                ${f(Note::updated)}: DATE_ISO8601(DATE_NOW())
+            }
+            in @@collection
+            return NEW
+    """.trimIndent(),
+    notes?.let {
+        mapOf(
+            "notes" to notes
+        )
+    } ?: emptyMap()
+)
+
+/**
+ * Removes any missing refs to [these notes] that are missing on the other notes
+ */
+fun Db.updateNoteRefs(notes: List<String>) = list(
+    Note::class,
+    """
+    for note in @@collection
+        filter note.${f(Note::ref)} any in @notes
+        for ref in @notes
+            let refs = document(@@collection, ref).ref
+            filter refs != null and note._key not in refs
+            update {
+                _key: note._key,
+                ${f(Note::ref)}: remove_value(note.${f(Note::ref)} || [], ref, true),
+                ${f(Note::updated)}: DATE_ISO8601(DATE_NOW())
+            }
+            in @@collection
+            return NEW
+    """.trimIndent(),
+    mapOf(
+        "notes" to notes
+    )
+)
+
+/**
  * Removes items not matching the given list from the graph.
  */
 fun Db.ensureNoteItems(note: String, items: List<String>, ref: List<String>) = list(

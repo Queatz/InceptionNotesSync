@@ -9,7 +9,7 @@ typealias IdAndRev = List<String?>
 val IdAndRev.id get() = get(0)!!
 val IdAndRev.rev get() = get(1)!!
 val IdAndRev.oldRev get() = get(2)
-fun Note.toIdAndRev(oldRev: String?) = listOf(id!!, rev!!, oldRev)
+fun Note.toIdAndRev(oldRev: String? = null) = listOf(id!!, rev!!, oldRev)
 
 // This must be the first event sent after a connection is opened
 @Serializable
