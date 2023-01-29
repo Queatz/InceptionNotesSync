@@ -59,10 +59,11 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
         val allIds = all.map { it.id }.toSet()
         val stateDiff = all
             .filter { clientState[it.id]?.rev != it.rev }
-            .mapNotNull { db.document(Note::class, it.id!!) }
+            .mapNotNull { db.document(Note::class, it.id) }
             .map { json.encodeToJsonElement(it).jsonObject }
         val gone = clientState.keys.filter { !allIds.contains(it) }
-        return listOf(SyncOutgoingEvent(stateDiff, gone = gone, full = true))
+        val view = all.filter { it.access == ItemLink.Ref }.map { it.id }
+        return listOf(SyncOutgoingEvent(stateDiff, gone = gone, view = view, full = true))
     }
 
     private suspend fun get(event: GetEvent): List<OutgoingEvent> {

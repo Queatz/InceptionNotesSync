@@ -14,6 +14,9 @@ class Notes {
         note.rev = null // ensure this gets set by server
         note.created = null
         note.updated = null
+        if (note.name == null) {
+            note.name = ""
+        }
         if (note.items == null) {
             note.items = emptyList()
         }

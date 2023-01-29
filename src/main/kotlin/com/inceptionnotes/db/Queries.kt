@@ -1,5 +1,9 @@
 package com.inceptionnotes.db
 
+import com.inceptionnotes.json
+import com.inceptionnotes.ws.IdAndRev
+import kotlinx.serialization.decodeFromString
+
 /**
  * Returns the total number of invitations.
  */
@@ -58,7 +62,7 @@ fun Db.invitationIdsForNote(note: String, includeRefs: Boolean = false) = query(
         for invitation in flatten(
             for v, e in 0..99 inbound @note graph `${Item::class.graph}`
                 prune found = ${if (includeRefs) "e._to != @note and" else ""} e.${f(Item::link)} == ${v(ItemLink.Ref)} // stop at refs
-                options { order: 'weighted', uniqueVertices: 'global' }
+                options { order: 'weighted', uniqueVertices: 'path' }
                 ${if (includeRefs) "" else "filter not found"}
                 return append(v.${f(Note::invitations)}, [v.${f(Note::steward)}])
         )
@@ -75,7 +79,7 @@ fun Db.invitationsForNote(note: String, includeRefs: Boolean = false) = list(
         for invitation in flatten(
             for v, e in 0..99 inbound @note graph `${Item::class.graph}`
                 prune found = ${if (includeRefs) "e._to != @note and" else ""} e.${f(Item::link)} == ${v(ItemLink.Ref)} // stop at refs
-                options { order: 'weighted', uniqueVertices: 'global' }
+                options { order: 'weighted', uniqueVertices: 'path' }
                 ${if (includeRefs) "" else "filter not found"}
                 return append(
                     (
@@ -95,29 +99,36 @@ fun Db.invitationsForNote(note: String, includeRefs: Boolean = false) = list(
  *
  * Includes refs
  */
-fun Db.allNoteRevsByInvitation(invitation: String) = list(
-    Note::class, """
+fun Db.allNoteRevsByInvitation(invitation: String): List<IdAndRevAndAccess> = query(
+    List::class, """
         // find all notes with an invitation
         let ids = (
-            for note in @@collection
+            for note in ${Note::class.collection}
                 filter note.${f(Note::steward)} == @invitation
                         or @invitation in note.${f(Note::invitations)}
                     return note._id
         )
         // find all notes under any of those notes
-        for note in @@collection
-            filter note._id in ids or first(
-                for v, e in 1..99 inbound note graph `${Item::class.graph}`
+        for note in ${Note::class.collection}
+            let access = (note._id in ids) ? ${v(ItemLink.Item)} : first(
+                for v, e, p in 1..99 inbound note graph `${Item::class.graph}`
                     prune stop = v._id in ids or (e._to != note._id and e.${f(Item::link)} == ${v(ItemLink.Ref)}) // stop at refs except initial link (note might be a ref)
-                    options { order: 'weighted', uniqueVertices: 'global' }
+                    options { order: 'weighted', uniqueVertices: 'path' }
                     filter stop and v._id in ids
+                    sort p.edges[0].${f(Item::link)} == ${v(ItemLink.Ref)}
                     limit 1
-                    return true
-            ) == true
-            return keep(note, '_rev', '_key')
+                    return p.edges[0].${f(Item::link)}
+            )
+            filter access != null
+            return [note._key, note._rev, access]
     """.trimIndent(),
     mapOf("invitation" to invitation)
-)
+) as List<IdAndRevAndAccess>
+
+typealias IdAndRevAndAccess = List<String>
+val IdAndRev.id get() = get(0)!!
+val IdAndRev.rev get() = get(1)!!
+val IdAndRev.access get() = json.decodeFromString<ItemLink>(get(2)!!)
 
 /**
  * Inserts items matching the given list into the graph.

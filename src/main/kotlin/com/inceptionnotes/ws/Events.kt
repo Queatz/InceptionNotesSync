@@ -61,6 +61,7 @@ data class IdentifyOutgoingEvent(
 data class SyncOutgoingEvent(
     val notes: List<JsonObject>,
     val gone: List<String>? = null,
+    val view: List<String>? = null,
     val full: Boolean? = null
 ) : OutgoingEvent() {
     companion object {
