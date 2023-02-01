@@ -22,7 +22,8 @@ fun Route.syncRoutes() {
                     HttpStatusCode.NotFound
                 } else {
                     json.encodeToString(
-                        ws.getSession(deviceToken)?.receive(call.receiveText())
+                        ws.getSession(deviceToken)
+                            ?.receive(call.receiveText())
                             ?.map { it.toJsonArrayEvent() }
                             ?: return@respondJson HttpStatusCode.BadRequest.description("Websocket connection must also be open")
                     )

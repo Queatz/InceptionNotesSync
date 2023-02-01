@@ -79,7 +79,10 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
             val note = db.document(Note::class, clientNote.id!!)
             val oldRev = clientNote.rev
 
-            if (note == null) {
+            if (changesAccess(me, note, clientNote)) {
+                logger.warn("Client sent a note that would change access. Client should have prevented this from happening.")
+                null
+            } else if (note == null) {
                 if (clientNote.steward == null) {
                     clientNote.steward = me
                 }
@@ -105,6 +108,35 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
         }
 
         return if (state.isEmpty()) emptyList() else listOf(StateOutgoingEvent(state))
+    }
+
+    private fun changesAccess(invitation: String, currentNote: Note?, updatedNote: Note): Boolean {
+        // Find all added items
+        val newItems = (updatedNote.items ?: emptyList()).let { items ->
+            if (currentNote == null)
+                // All items are newly added
+                items
+            else {
+                // Find newly added notes
+                items.filter { !currentNote.items!!.contains(it) }
+            }
+        }
+        // Find all added refs
+        val newRefs = (updatedNote.items ?: emptyList()).let { refs ->
+            if (currentNote == null)
+                // All refs are newly added
+                refs
+            else {
+                // Find newly added refs
+                refs.filter { !(currentNote.ref ?: emptyList()).contains(it) }
+            }
+        }
+
+        return newItems.any {
+            !db.invitationIdsForNote(it, false).contains(invitation)
+        } || newRefs.any {
+            !db.invitationIdsForNote(it, true).contains(invitation)
+        }
     }
 
     suspend fun send(events: List<OutgoingEvent>) =

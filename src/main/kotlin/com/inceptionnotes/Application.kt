@@ -44,9 +44,7 @@ fun Application.module() {
         allowNonSimpleContentTypes = true
         allowMethod(HttpMethod.Options)
         allowHeader(HttpHeaders.Authorization)
-        allowHost("inceptionnotes.com")
-        allowHost("localhost:4200")
-        // todo also allow Android app
+        anyHost()
     }
     install(DefaultHeaders)
     install(ContentNegotiation) {
