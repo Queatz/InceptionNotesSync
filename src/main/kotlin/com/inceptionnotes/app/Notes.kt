@@ -30,7 +30,11 @@ class Notes {
 
     fun update(note: Note, referenceNote: Note, jsonObject: JsonObject): Note {
         note.updateFrom(referenceNote)
+
+        //Removable fields
         if (jsonObject["description"] is JsonNull) note.description = null
+        if (jsonObject["date"] is JsonNull) note.date = null
+
         val updatedNote = db.update(note)
         if (referenceNote.items != null || referenceNote.ref != null) {
             updateNoteGraph(updatedNote)
@@ -73,6 +77,7 @@ private fun Note.updateFrom(referenceNote: Note) {
         referenceNote,
         Note::invitations,
         Note::name,
+        Note::date,
         Note::description,
         Note::checked,
         Note::color,

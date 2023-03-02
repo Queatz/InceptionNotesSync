@@ -90,15 +90,24 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
                 syncEvents.add(SyncOutgoingEvent(listOf(newNote.syncJsonObject(Note::steward))))
                 noteChanged(invitation!!, json.encodeToJsonElement(newNote).jsonObject)
                 newNote.toIdAndRev(oldRev)
-            } else if (oldRev == note.rev && notes.canEdit(me, note)) {
-                val updatedNote = notes.update(note, clientNote, jsonObject)
-                noteChanged(invitation!!, json.encodeToJsonElement(
-                    jsonObject.toMutableMap().also {
-                        it["rev"] = json.parseToJsonElement(updatedNote.rev!!)
-                    }
-                ).jsonObject)
-                updatedNote.toIdAndRev(oldRev)
+            } else if (oldRev == note.rev) {
+                if (notes.canEdit(me, note)) {
+                    val updatedNote = notes.update(note, clientNote, jsonObject)
+                    noteChanged(invitation!!, json.encodeToJsonElement(
+                        jsonObject.toMutableMap().also {
+                            it["rev"] = json.parseToJsonElement(updatedNote.rev!!)
+                        }
+                    ).jsonObject)
+                    updatedNote.toIdAndRev(oldRev)
+                } else {
+                    // todo tell the client to stop sending this note
+                    logger.warn("Client sent a note they are unable to edit.")
+                    syncEvents.add(SyncOutgoingEvent(listOf(note.jsonObject())))
+                    null
+                }
             } else {
+                logger.warn("Client sent a note with a mismatched revision.")
+                syncEvents.add(SyncOutgoingEvent(listOf(note.jsonObject())))
                 null
             }
         }
@@ -107,7 +116,9 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
             noteChanged(null, updatedNote.syncJsonObject(Note::ref))
         }
 
-        return if (state.isEmpty()) emptyList() else listOf(StateOutgoingEvent(state))
+        return (
+            if (state.isEmpty()) emptyList() else listOf(StateOutgoingEvent(state))
+        ) + syncEvents
     }
 
     private fun changesAccess(invitation: String, currentNote: Note?, updatedNote: Note): Boolean {
@@ -133,9 +144,11 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
         }
 
         return newItems.any {
-            !db.invitationIdsForNote(it, false).contains(invitation)
+            // If note contains no invitations then it doesn't exist yet, so assume access doesn't change
+            db.invitationIdsForNote(it, false).let { it.isNotEmpty() && !it.contains(invitation) }
         } || newRefs.any {
-            !db.invitationIdsForNote(it, true).contains(invitation)
+            // If note contains no invitations then it doesn't exist yet, so assume access doesn't change
+            db.invitationIdsForNote(it, true).let { it.isNotEmpty() && !it.contains(invitation) }
         }
     }
 
@@ -214,6 +227,8 @@ class Ws {
         }
     }
 }
+
+fun Note.jsonObject() = json.encodeToJsonElement(this).jsonObject
 
 fun Note.syncJsonObject(vararg fields: KMutableProperty1<Note, *>) = buildJsonObject {
     put(f(Note::id), id)

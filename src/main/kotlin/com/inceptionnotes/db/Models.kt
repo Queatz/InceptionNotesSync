@@ -35,6 +35,7 @@ data class Note(
     var steward: String? = null,
     var invitations: List<String>? = null,
     var name: String? = null,
+    var date: Instant? = null,
     var description: String? = null,
     var checked: Boolean? = null,
     var color: String? = null,

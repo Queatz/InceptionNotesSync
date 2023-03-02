@@ -66,6 +66,7 @@ fun Db.invitationIdsForNote(note: String, includeRefs: Boolean = false) = query(
                 ${if (includeRefs) "" else "filter not found"}
                 return append(v.${f(Note::invitations)}, [v.${f(Note::steward)}])
         )
+            filter invitation != null
             return distinct invitation
     """.trimIndent(),
     mapOf("note" to note.asId(Note::class))
