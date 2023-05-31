@@ -8,9 +8,7 @@ import com.arangodb.entity.Rev
 import com.arangodb.entity.To
 import com.arangodb.internal.DocumentFields
 import com.arangodb.velocypack.annotations.SerializedName
-import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.fasterxml.jackson.databind.annotation.JsonNaming
 import kotlinx.datetime.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName

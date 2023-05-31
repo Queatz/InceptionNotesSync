@@ -6,6 +6,9 @@ import com.inceptionnotes.updateAllFrom
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 
+/**
+ * Common note operations.
+ */
 class Notes {
     fun insert(note: Note): Note {
         note.rev = null // ensure this gets set by server

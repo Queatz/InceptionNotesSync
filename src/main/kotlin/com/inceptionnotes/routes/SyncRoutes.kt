@@ -14,6 +14,8 @@ fun Route.syncRoutes() {
         /**
          * Send websocket events over http.  Useful for large amounts of data.
          *
+         * A websocket connection with this device must be active.
+         *
          * Returns websocket events for client consumption.
          */
         post("http") {

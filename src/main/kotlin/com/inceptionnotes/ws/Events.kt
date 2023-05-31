@@ -11,7 +11,11 @@ val IdAndRev.rev get() = get(1)!!
 val IdAndRev.oldRev get() = get(2)
 fun Note.toIdAndRev(oldRev: String? = null) = listOf(id!!, rev!!, oldRev)
 
-// This must be the first event sent after a connection is opened
+/**
+ * Set the device token for this session, expecting invitation details in return.
+ *
+ * Must be the first event after a session is opened.
+ */
 @Serializable
 data class IdentifyEvent(
     val device: String
@@ -21,6 +25,9 @@ data class IdentifyEvent(
     }
 }
 
+/**
+ * Tell the server the client's current state, expecting sync events in return.
+ */
 @Serializable
 data class StateEvent(
     val notes: List<IdAndRev>
@@ -30,6 +37,9 @@ data class StateEvent(
     }
 }
 
+/**
+ * Tell the server about note changes.
+ */
 @Serializable
 data class SyncEvent(
     val notes: List<JsonObject>
@@ -39,6 +49,9 @@ data class SyncEvent(
     }
 }
 
+/**
+ * Tell the server to send complete note(s).
+ */
 @Serializable
 data class GetEvent(
     val notes: List<String>
@@ -48,6 +61,9 @@ data class GetEvent(
     }
 }
 
+/**
+ * Tell the client their invitation details.
+ */
 @Serializable
 data class IdentifyOutgoingEvent(
     val invitation: Invitation
@@ -57,6 +73,14 @@ data class IdentifyOutgoingEvent(
     }
 }
 
+/**
+ * Tell the client about note changes.
+ *
+ * @notes The list of notes containing changed props.
+ * @gone A list of notes the client should forget.
+ * @view A list of notes the client should not edit.
+ * @full Whether the list of notes is all changed notes
+ */
 @Serializable
 data class SyncOutgoingEvent(
     val notes: List<JsonObject>,
@@ -69,6 +93,9 @@ data class SyncOutgoingEvent(
     }
 }
 
+/**
+ * Send the client a full note.
+ */
 @Serializable
 data class GetOutgoingEvent(
     val notes: List<Note>
@@ -78,6 +105,9 @@ data class GetOutgoingEvent(
     }
 }
 
+/**
+ * Tell the client invitation(s) changed.
+ */
 @Serializable
 data class InvitationOutgoingEvent(
     val reload: Boolean = true
@@ -87,6 +117,9 @@ data class InvitationOutgoingEvent(
     }
 }
 
+/**
+ * Tell the client the current server state of notes.
+ */
 @Serializable
 data class StateOutgoingEvent(
     val notes: List<IdAndRev>

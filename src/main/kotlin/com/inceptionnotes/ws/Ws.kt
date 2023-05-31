@@ -102,7 +102,7 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
                 } else {
                     // todo tell the client to stop sending this note
                     logger.warn("Client sent a note they are unable to edit.")
-                    syncEvents.add(SyncOutgoingEvent(listOf(note.jsonObject())))
+                    syncEvents.add(SyncOutgoingEvent(listOf(note.jsonObject()), view = listOf(note.id!!)))
                     null
                 }
             } else {
