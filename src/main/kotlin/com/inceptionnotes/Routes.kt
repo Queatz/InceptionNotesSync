@@ -45,15 +45,19 @@ fun Application.routes() {
 fun PipelineContext<*, ApplicationCall>.me(): Invitation? {
     return call.principal<InvitationPrincipal>()?.invitation
 }
-val PipelineContext<*, ApplicationCall>.deviceToken: String get() =
-    call.principal<InvitationPrincipal>()!!.deviceToken
+
+val PipelineContext<*, ApplicationCall>.deviceToken: String
+    get() =
+        call.principal<InvitationPrincipal>()!!.deviceToken
 
 suspend inline fun <reified T : Any> PipelineContext<*, ApplicationCall>.steward(returnIfSteward: () -> T) {
     if (me()?.isSteward == true) respond { returnIfSteward() } else respond { HttpStatusCode.NotFound }
 }
+
 suspend inline fun <reified T : Any> PipelineContext<*, ApplicationCall>.respond(block: () -> T) {
     call.respond(block())
 }
+
 suspend inline fun <reified T : Any> PipelineContext<*, ApplicationCall>.respondJson(block: () -> T) {
     val result = block()
     when (result) {

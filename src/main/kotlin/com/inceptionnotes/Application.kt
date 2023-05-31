@@ -26,7 +26,7 @@ fun main() {
 
 class InvitationPrincipal(
     val deviceToken: String,
-    val invitation: Invitation?
+    val invitation: Invitation?,
 ) : Principal
 
 fun Application.module() {
@@ -53,7 +53,10 @@ fun Application.module() {
     install(Authentication) {
         bearer {
             authenticate { bearer ->
-                InvitationPrincipal(bearer.token, db.invitationFromDeviceToken(bearer.token) ?: initialize(bearer.token))
+                InvitationPrincipal(
+                    bearer.token,
+                    db.invitationFromDeviceToken(bearer.token) ?: initialize(bearer.token)
+                )
             }
         }
     }

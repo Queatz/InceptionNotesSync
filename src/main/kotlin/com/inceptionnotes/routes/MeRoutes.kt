@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class MeInvitationEvent(
-    val token: String
+    val token: String,
 )
 
 fun Route.meRoutes() {

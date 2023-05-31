@@ -29,7 +29,10 @@ inline fun <reified T : OutgoingEvent> T.toJsonArrayEvent() = buildJsonArray {
     add(json.encodeToJsonElement(this@toJsonArrayEvent))
 }
 
-class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: suspend (Invitation?, JsonObject) -> Unit) {
+class WsSession(
+    val session: DefaultWebSocketServerSession,
+    val noteChanged: suspend (Invitation?, JsonObject) -> Unit,
+) {
 
     var invitation: Invitation? = null
         private set
@@ -117,15 +120,15 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
         }
 
         return (
-            if (state.isEmpty()) emptyList() else listOf(StateOutgoingEvent(state))
-        ) + syncEvents
+                if (state.isEmpty()) emptyList() else listOf(StateOutgoingEvent(state))
+                ) + syncEvents
     }
 
     private fun changesAccess(invitation: String, currentNote: Note?, updatedNote: Note): Boolean {
         // Find all added items
         val newItems = (updatedNote.items ?: emptyList()).let { items ->
             if (currentNote == null)
-                // All items are newly added
+            // All items are newly added
                 items
             else {
                 // Find newly added notes
@@ -135,7 +138,7 @@ class WsSession(val session: DefaultWebSocketServerSession, val noteChanged: sus
         // Find all added refs
         val newRefs = (updatedNote.items ?: emptyList()).let { refs ->
             if (currentNote == null)
-                // All refs are newly added
+            // All refs are newly added
                 refs
             else {
                 // Find newly added refs

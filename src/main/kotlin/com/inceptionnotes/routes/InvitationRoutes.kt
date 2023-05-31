@@ -39,11 +39,13 @@ fun Route.invitationRoutes() {
          * Returns an invitation.
          */
         get("/invitations/{id}") {
-            respond { db.document(Invitation::class, parameter("id"))?.let {
-                if (me()?.isSteward != true) {
-                    it.token = null
-                } else it
-            } ?: HttpStatusCode.NotFound }
+            respond {
+                db.document(Invitation::class, parameter("id"))?.let {
+                    if (me()?.isSteward != true) {
+                        it.token = null
+                    } else it
+                } ?: HttpStatusCode.NotFound
+            }
         }
 
         /**
@@ -51,7 +53,8 @@ fun Route.invitationRoutes() {
          */
         post("/invitations/{id}") {
             steward {
-                val invitation = db.document(Invitation::class, parameter("id")) ?: return@steward HttpStatusCode.NotFound
+                val invitation =
+                    db.document(Invitation::class, parameter("id")) ?: return@steward HttpStatusCode.NotFound
                 val update = call.receive<Invitation>()
 
                 if (update.isSteward != null) {
@@ -75,7 +78,8 @@ fun Route.invitationRoutes() {
          */
         post("/invitations/{id}/delete") {
             steward {
-                val invitation = db.document(Invitation::class, parameter("id")) ?: return@steward HttpStatusCode.NotFound
+                val invitation =
+                    db.document(Invitation::class, parameter("id")) ?: return@steward HttpStatusCode.NotFound
 
                 if (invitation.isSteward == true) {
                     HttpStatusCode.BadRequest.description("Stewards cannot be removed")
