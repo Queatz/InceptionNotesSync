@@ -86,11 +86,15 @@ class WsSession(
                 logger.warn("Client sent a note that would change access. Client should have prevented this from happening.")
                 null
             } else if (note == null) {
-                if (clientNote.steward == null) {
-                    clientNote.steward = me
+                var invitationsChanged = false
+                if (clientNote.invitations?.find { it == me } == null) {
+                    clientNote.invitations = clientNote.invitations?.let { it + me } ?: listOf(me)
+                    invitationsChanged = true
                 }
                 val newNote = notes.insert(clientNote)
-                syncEvents.add(SyncOutgoingEvent(listOf(newNote.syncJsonObject(Note::steward))))
+                if (invitationsChanged) {
+                    syncEvents.add(SyncOutgoingEvent(listOf(newNote.syncJsonObject(Note::invitations))))
+                }
                 noteChanged(invitation!!, json.encodeToJsonElement(newNote).jsonObject)
                 newNote.toIdAndRev(oldRev)
             } else if (oldRev == note.rev) {
@@ -136,7 +140,7 @@ class WsSession(
             }
         }
         // Find all added refs
-        val newRefs = (updatedNote.items ?: emptyList()).let { refs ->
+        val newRefs = (updatedNote.ref ?: emptyList()).let { refs ->
             if (currentNote == null)
             // All refs are newly added
                 refs
@@ -146,11 +150,10 @@ class WsSession(
             }
         }
 
+        // If note contains no invitations, then it doesn't exist yet, so assume access doesn't change
         return newItems.any {
-            // If note contains no invitations then it doesn't exist yet, so assume access doesn't change
             db.invitationIdsForNote(it, false).let { it.isNotEmpty() && !it.contains(invitation) }
         } || newRefs.any {
-            // If note contains no invitations then it doesn't exist yet, so assume access doesn't change
             db.invitationIdsForNote(it, true).let { it.isNotEmpty() && !it.contains(invitation) }
         }
     }
@@ -239,7 +242,6 @@ fun Note.syncJsonObject(vararg fields: KMutableProperty1<Note, *>) = buildJsonOb
     fields.forEach {
         when (it) {
             Note::invitations -> json.encodeToJsonElement(invitations)
-            Note::steward -> json.encodeToJsonElement(steward)
             Note::name -> json.encodeToJsonElement(name)
             Note::description -> json.encodeToJsonElement(description)
             Note::checked -> json.encodeToJsonElement(checked)

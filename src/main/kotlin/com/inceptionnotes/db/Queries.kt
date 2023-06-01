@@ -64,7 +64,7 @@ fun Db.invitationIdsForNote(note: String, includeRefs: Boolean = false) = query(
                 prune found = ${if (includeRefs) "e._to != @note and" else ""} e.${f(Item::link)} == ${v(ItemLink.Ref)} // stop at refs
                 options { order: 'weighted', uniqueVertices: 'path' }
                 ${if (includeRefs) "" else "filter not found"}
-                return append(v.${f(Note::invitations)}, [v.${f(Note::steward)}])
+                return v.${f(Note::invitations)} || []
         )
             filter invitation != null
             return distinct invitation
@@ -82,12 +82,9 @@ fun Db.invitationsForNote(note: String, includeRefs: Boolean = false) = list(
                 prune found = ${if (includeRefs) "e._to != @note and" else ""} e.${f(Item::link)} == ${v(ItemLink.Ref)} // stop at refs
                 options { order: 'weighted', uniqueVertices: 'path' }
                 ${if (includeRefs) "" else "filter not found"}
-                return append(
-                    (
-                        for x in v.${f(Note::invitations)}
-                            return document(`${Invitation::class.collection}`, x)
-                    ),
-                    [document(`${Invitation::class.collection}`, v.${f(Note::steward)})]
+                return (
+                    for x in v.${f(Note::invitations)}
+                        return document(`${Invitation::class.collection}`, x)
                 )
         )
             return distinct invitation
@@ -105,8 +102,7 @@ fun Db.allNoteRevsByInvitation(invitation: String): List<IdAndRevAndAccess> = qu
         // find all notes with an invitation
         let ids = (
             for note in ${Note::class.collection}
-                filter note.${f(Note::steward)} == @invitation
-                        or @invitation in note.${f(Note::invitations)}
+                filter @invitation in note.${f(Note::invitations)}
                     return note._id
         )
         // find all notes under any of those notes

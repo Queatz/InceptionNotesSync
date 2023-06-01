@@ -54,25 +54,13 @@ class Notes {
         db.ensureNoteItems(note.id!!, note.items!!, note.ref!!)
     }
 
-    fun canEdit(invitation: String, note: Note): Boolean {
-        return if (note.steward == invitation || note.invitations?.contains(invitation) == true) {
-            true
-        } else db.invitationsForNote(note.id!!).any { it.id == invitation }
-    }
+    fun canEdit(invitation: String, note: Note) = if (note.invitations?.contains(invitation) == true) {
+        true
+    } else canEdit(invitation, note.id!!)
 
-    fun canEdit(invitation: String, note: String): Boolean {
-        return if (db.invitationsForNote(note).any { it.id == invitation })
-            true
-        else steward(note) == invitation
-    }
+    fun canEdit(invitation: String, note: String) = db.invitationsForNote(note).any { it.id == invitation }
 
-    fun canView(invitation: String, note: String): Boolean {
-        return if (db.invitationsForNote(note, true).any { it.id == invitation })
-            true
-        else steward(note) == invitation
-    }
-
-    fun steward(note: String) = db.document(Note::class, note)?.steward
+    fun canView(invitation: String, note: String) = db.invitationsForNote(note, true).any { it.id == invitation }
 }
 
 private fun Note.updateFrom(referenceNote: Note) {

@@ -30,7 +30,6 @@ data class Invitation(
 
 @Serializable
 data class Note(
-    var steward: String? = null,
     var invitations: List<String>? = null,
     var name: String? = null,
     var date: Instant? = null,

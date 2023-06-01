@@ -4,7 +4,6 @@ import com.arangodb.entity.CollectionType
 
 fun collections() = listOf(
     collection<Note> {
-        index(Note::steward)
         index(Note::items)
         index(Note::ref)
         index(Note::invitations)
