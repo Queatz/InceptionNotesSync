@@ -32,9 +32,7 @@ fun Application.routes() {
                 ws.disconnect(this)
             }
         }
-        static("/static") {
-            resources("static")
-        }
+        staticResources("/static", "static")
         meRoutes()
         invitationRoutes()
         syncRoutes()

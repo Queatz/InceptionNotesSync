@@ -10,11 +10,12 @@ import kotlinx.serialization.json.JsonObject
  * Common note operations.
  */
 class Notes {
-    fun insert(note: Note): Note {
+    fun insert(device: String, note: Note): Note {
         note.rev = null // ensure this gets set by server
+        note.revSrc = device
         note.created = null
         note.updated = null
-        if (note.name == null) {
+        if (note.name === null) {
             note.name = ""
         }
         if (note.items == null) {
@@ -31,8 +32,9 @@ class Notes {
         return newNote
     }
 
-    fun update(note: Note, referenceNote: Note, jsonObject: JsonObject): Note {
+    fun update(device: String, note: Note, referenceNote: Note, jsonObject: JsonObject): Note {
         note.updateFrom(referenceNote)
+        note.revSrc = device
 
         //Removable fields
         if (jsonObject["description"] is JsonNull) note.description = null

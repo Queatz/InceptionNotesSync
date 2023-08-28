@@ -123,6 +123,7 @@ fun Db.allNoteRevsByInvitation(invitation: String): List<IdAndRevAndAccess> = qu
 ) as List<IdAndRevAndAccess>
 
 typealias IdAndRevAndAccess = List<String>
+
 val IdAndRev.id get() = get(0)!!
 val IdAndRev.rev get() = get(1)!!
 val IdAndRev.access get() = json.decodeFromString<ItemLink>(get(2)!!)

@@ -91,15 +91,15 @@ class WsSession(
                     clientNote.invitations = clientNote.invitations?.let { it + me } ?: listOf(me)
                     invitationsChanged = true
                 }
-                val newNote = notes.insert(clientNote)
+                val newNote = notes.insert(deviceToken!!, clientNote)
                 if (invitationsChanged) {
                     syncEvents.add(SyncOutgoingEvent(listOf(newNote.syncJsonObject(Note::invitations))))
                 }
                 noteChanged(invitation!!, json.encodeToJsonElement(newNote).jsonObject)
                 newNote.toIdAndRev(oldRev)
-            } else if (oldRev == note.rev) {
+            } else if (oldRev == note.rev || deviceToken!! == note.revSrc) {
                 if (notes.canEdit(me, note)) {
-                    val updatedNote = notes.update(note, clientNote, jsonObject)
+                    val updatedNote = notes.update(deviceToken!!, note, clientNote, jsonObject)
                     noteChanged(invitation!!, json.encodeToJsonElement(
                         jsonObject.toMutableMap().also {
                             it["rev"] = json.parseToJsonElement(updatedNote.rev!!)
