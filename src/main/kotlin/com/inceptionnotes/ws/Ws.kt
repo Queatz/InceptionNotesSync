@@ -123,9 +123,7 @@ class WsSession(
             noteChanged(null, updatedNote.syncJsonObject(Note::ref))
         }
 
-        return (
-                if (state.isEmpty()) emptyList() else listOf(StateOutgoingEvent(state))
-                ) + syncEvents
+        return (if (state.isEmpty()) emptyList() else listOf(StateOutgoingEvent(state))) + syncEvents
     }
 
     private fun changesAccess(invitation: String, currentNote: Note?, updatedNote: Note): Boolean {
@@ -217,11 +215,11 @@ class Ws {
 
     fun noteChanged(invitation: Invitation?, jsonObject: JsonObject) {
         val invitations = db.invitationIdsForNote(jsonObject["id"]!!.jsonPrimitive.content, true)
-        sessions.forEach {
-            if (it.invitation == null || it.invitation!!.id == invitation?.id || !invitations.contains(it.invitation!!.id)
+        sessions.forEach { session ->
+            if (session.invitation == null || session.invitation!!.id == invitation?.id || !invitations.contains(session.invitation!!.id)
             ) return@forEach
 
-            scope.launch { it.sendNote(jsonObject) }
+            scope.launch { session.sendNote(jsonObject) }
         }
     }
 

@@ -83,7 +83,7 @@ fun Db.invitationsForNote(note: String, includeRefs: Boolean = false) = list(
                 options { order: 'weighted', uniqueVertices: 'path' }
                 ${if (includeRefs) "" else "filter not found"}
                 return (
-                    for x in v.${f(Note::invitations)}
+                    for x in (v.${f(Note::invitations)} || [])
                         return document(`${Invitation::class.collection}`, x)
                 )
         )
@@ -102,7 +102,7 @@ fun Db.allNoteRevsByInvitation(invitation: String): List<IdAndRevAndAccess> = qu
         // find all notes with an invitation
         let ids = (
             for note in ${Note::class.collection}
-                filter @invitation in note.${f(Note::invitations)}
+                filter @invitation in (note.${f(Note::invitations)} || [])
                     return note._id
         )
         // find all notes under any of those notes
@@ -229,7 +229,7 @@ fun Db.removeDevicesByInvitation(invitation: String) = query(Unit::class, """
 
 fun Db.removeInvitationFromAllNotes(invitation: String) = list(Note::class, """
     for note in @@collection
-        filter @invitation in note.${f(Note::invitations)}
+        filter @invitation in (note.${f(Note::invitations)} || [])
         update { _key: note._key, ${f(Note::invitations)}: remove_value(note.${f(Note::invitations)}, @invitation) } in @@collection
         return NEW
 """.trimIndent(), mapOf("invitation" to invitation)

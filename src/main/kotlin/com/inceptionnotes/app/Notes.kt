@@ -15,7 +15,7 @@ class Notes {
         note.revSrc = device
         note.created = null
         note.updated = null
-        if (note.name === null) {
+        if (note.name == null) {
             note.name = ""
         }
         if (note.items == null) {
@@ -36,7 +36,7 @@ class Notes {
         note.updateFrom(referenceNote)
         note.revSrc = device
 
-        //Removable fields
+        // Removable fields
         if (jsonObject["description"] is JsonNull) note.description = null
         if (jsonObject["date"] is JsonNull) note.date = null
 
